@@ -1,5 +1,9 @@
+#include <string>     // std::string, std::stoi
+
 #include <parquet-file/parquet-file.h>
 #include <glog/logging.h>
+
+using std::stoi;
 
 using parquet_file::ParquetColumn;
 using parquet_file::ParquetFile;
@@ -12,6 +16,7 @@ int main(int argc, char* argv[]) {
   google::InitGoogleLogging(argv[0]);
 
   ParquetFile output(argv[1]);
+  int NN = stoi(argv[2], NULL, 0);
 
   ParquetColumn* one_column =
     new ParquetColumn({"AllInts"}, parquet::Type::INT32,
@@ -36,14 +41,14 @@ int main(int argc, char* argv[]) {
   root_column->SetChildren({one_column, two_column});
   output.SetSchema(root_column);
 
-  uint32_t data[500];
-  for (int i = 0; i < 500; ++i) {
+  uint32_t data[NN];
+  for (int i = 0; i < NN; ++i) {
     data[i] = i;
   }
-  one_column->AddRecords(data, 0, 500);
-  for (int i = 0; i < 500; ++i) {
+  one_column->AddRecords(data, 0, NN);
+  for (int i = 0; i < NN; ++i) {
     data[i] = i;
   }
-  two_column->AddRecords(data, 0, 500);
+  two_column->AddRecords(data, 0, NN);
   output.Flush();
 }
