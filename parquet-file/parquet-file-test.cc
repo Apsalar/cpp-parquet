@@ -1,5 +1,7 @@
 // Copyright 2014 Mount Sinai School of Medicine
 
+#include <signal.h>
+
 #include <parquet-file/parquet-file.h>
 
 #include <algorithm>

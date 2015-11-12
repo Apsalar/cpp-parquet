@@ -25,6 +25,9 @@ else()
   set(LIBSUFFIX "")
 endif()
 
+# Not ending up in lib64 on Fedora22 ... 
+set(LIBSUFFIX "")
+
 ADD_LIBRARY(glog STATIC IMPORTED)
 SET_PROPERTY(TARGET glog PROPERTY IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/third_party/google-glog/lib${LIBSUFFIX}/libglog.a)
 ADD_DEPENDENCIES(glog google-glog)
