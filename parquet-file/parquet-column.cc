@@ -376,8 +376,10 @@ void ParquetColumn::Flush(int fd,
                           TCompactProtocol* protocol) {
   LOG_IF(FATAL, getEncoding() != Encoding::PLAIN)
     << "Encoding can only be plain at this time.";
+#if 0  
   LOG_IF(FATAL, getCompressionCodec() != CompressionCodec::UNCOMPRESSED)
     << "Compression is not supported at this time.";
+#endif
   LOG_IF(FATAL, Children().size() != 0)  <<
       "Flush called on container column";
 
