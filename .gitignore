@@ -13,6 +13,7 @@ test.parquet
 
 avro-schema-walker-example
 avro-parquet-encoder
+protobuf-parquet-encoder
 cppparquet
 parquet-file-test
 
