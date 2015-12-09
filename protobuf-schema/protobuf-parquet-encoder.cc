@@ -28,6 +28,7 @@ char const * DEF_ROOTMSG = "";
 string g_protodir = DEF_PROTODIR;
 string g_protofile = DEF_PROTOFILE;
 string g_rootmsg = DEF_ROOTMSG;
+bool g_dodump = false;    
     
 void
 usage(int & argc, char ** & argv)
@@ -38,6 +39,7 @@ usage(int & argc, char ** & argv)
          << "    -d, --protodir=DIR    protobuf src dir    [" << DEF_PROTODIR << "]" << endl
          << "    -p, --protofile=FILE  protobuf src file   [" << DEF_PROTOFILE << "]" << endl
          << "    -m, --rootmsg=MSG     root message name   [" << DEF_ROOTMSG << "]" << endl
+         << "    -u, --dump            pretty print the schema to stderr" << endl
         ;
 }
 
@@ -52,13 +54,14 @@ parse_arguments(int & argc, char ** & argv)
             {"protodir",                required_argument,  0, 'd'},
             {"protofile",               required_argument,  0, 'p'},
             {"rootmsg",                 required_argument,  0, 'm'},
+            {"dump",                    no_argument,        0, 'u'},
             {0, 0, 0, 0}
         };
 
     while (true)
     {
         int optndx = 0;
-        int opt = getopt_long(argc, argv, "hd:p:m:",
+        int opt = getopt_long(argc, argv, "hd:p:m:u",
                               long_options, &optndx);
 
         // Are we done processing arguments?
@@ -81,6 +84,10 @@ parse_arguments(int & argc, char ** & argv)
 
         case 'm':
             g_rootmsg = optarg;
+            break;
+
+        case 'u':
+            g_dodump = true;
             break;
 
         case'?':
@@ -116,7 +123,8 @@ int run(int & argc, char ** & argv)
     google::InitGoogleLogging(argv[0]);
     parse_arguments(argc, argv);
     Schema schema(g_protodir, g_protofile, g_rootmsg);
-    schema.dump(cout);
+    if (g_dodump)
+        schema.dump(cerr);
     return 0;
 }
     
