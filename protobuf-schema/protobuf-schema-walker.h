@@ -25,9 +25,9 @@ public:
 class Schema
 {
 public:
-    Schema(std::string const & i_dirpath,
-           std::string const & i_filename,
-           std::string const & i_topmsg);
+    Schema(std::string const & i_protodir,
+           std::string const & i_protofile,
+           std::string const & i_rootmsg);
 
     void dump(std::ostream & ostrm);
 

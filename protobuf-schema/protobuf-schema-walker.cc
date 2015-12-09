@@ -9,6 +9,8 @@
 #include <string>
 #include <sstream>
 
+#include <glog/logging.h>
+
 #include <google/protobuf/compiler/importer.h>
 
 #include "protobuf-schema-walker.h"
@@ -100,15 +102,22 @@ class MyErrorCollector : public MultiFileErrorCollector
     
 } // end namespace
 
-Schema::Schema(string const & i_dirpath,
-               string const & i_filename,
-               string const & i_topmsg)
+Schema::Schema(string const & i_protodir,
+               string const & i_protofile,
+               string const & i_rootmsg)
 {
-    m_srctree.MapPath("", i_dirpath);
+    m_srctree.MapPath("", i_protodir);
     m_errcollp = new MyErrorCollector();
     m_importerp = new Importer(&m_srctree, m_errcollp);
-    FileDescriptor const * fdp = m_importerp->Import(i_filename);
-    m_typep = fdp->FindMessageTypeByName(i_topmsg);
+    FileDescriptor const * fdp = m_importerp->Import(i_protofile);
+    if (!fdp) {
+        LOG(FATAL) << "trouble opening proto file " << i_protofile
+                   << " in directory " << i_protodir;
+    }
+    m_typep = fdp->FindMessageTypeByName(i_rootmsg);
+    if (!m_typep) {
+        LOG(FATAL) << "couldn't find root message: " << i_rootmsg;
+    }
 }
 
 void

@@ -9,6 +9,8 @@
 #include <iostream>
 #include <stdexcept>
 
+#include <glog/logging.h>
+
 #include <google/protobuf/descriptor.h>
 
 #include "protobuf-schema-walker.h"
@@ -111,6 +113,7 @@ parse_arguments(int & argc, char ** & argv)
     
 int run(int & argc, char ** & argv)
 {
+    google::InitGoogleLogging(argv[0]);
     parse_arguments(argc, argv);
     Schema schema(g_protodir, g_protofile, g_rootmsg);
     schema.dump(cout);
