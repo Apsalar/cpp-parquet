@@ -12,6 +12,7 @@
 
 #include <google/protobuf/compiler/importer.h>
 #include <google/protobuf/descriptor.h>
+#include <google/protobuf/dynamic_message.h>
 
 class FieldTraverser
 {
@@ -31,13 +32,19 @@ public:
 
     void dump(std::ostream & ostrm);
 
+    void convert(std::string const & infile);
+
 private:
     void traverse(FieldTraverser & ft);
+
+    bool process_record(std::istream & istrm);
     
     google::protobuf::compiler::DiskSourceTree	m_srctree;
     google::protobuf::compiler::MultiFileErrorCollector	* m_errcollp;
     google::protobuf::compiler::Importer *		m_importerp;
     google::protobuf::Descriptor const *		m_typep;
+    google::protobuf::DynamicMessageFactory		m_dmsgfact;
+    google::protobuf::Message const *			m_proto;
 };
 
 // Local Variables:

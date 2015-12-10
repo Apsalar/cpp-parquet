@@ -30,11 +30,11 @@ output_document(pb_sample::Document const & doc)
     // Type int8 // 1=owner,2=attr_feed
     // Size int32
 
-    int16_t protocol = htons(1);
+    int16_t proto = htons(1);
     int8_t type = 1;
     int32_t size = htonl(ostrm.str().size());
 
-    cout.write((char const *) &protocol, sizeof(protocol));
+    cout.write((char const *) &proto, sizeof(proto));
     cout.write((char const *) &type, sizeof(type));
     cout.write((char const *) &size, sizeof(size));
     cout.write(ostrm.str().data(), ostrm.str().size());

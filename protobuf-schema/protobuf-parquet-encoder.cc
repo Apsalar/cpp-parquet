@@ -24,21 +24,24 @@ namespace {
 char const * DEF_PROTODIR = "./";
 char const * DEF_PROTOFILE = "";
 char const * DEF_ROOTMSG = "";
+char const * DEF_INFILE = "";
 
 string g_protodir = DEF_PROTODIR;
 string g_protofile = DEF_PROTOFILE;
 string g_rootmsg = DEF_ROOTMSG;
+string g_infile = DEF_INFILE;
 bool g_dodump = false;    
     
 void
 usage(int & argc, char ** & argv)
 {
-    cerr << "usage: " << argv[0] << " [options] -p <protofile> -m <rootmsg> -i <datafile>" << endl
+    cerr << "usage: " << argv[0] << " [options] -p <protofile> -m <rootmsg> [-i <infile>]" << endl
          << "  options:" << endl
          << "    -h, --help            display usage" << endl
          << "    -d, --protodir=DIR    protobuf src dir    [" << DEF_PROTODIR << "]" << endl
          << "    -p, --protofile=FILE  protobuf src file   [" << DEF_PROTOFILE << "]" << endl
          << "    -m, --rootmsg=MSG     root message name   [" << DEF_ROOTMSG << "]" << endl
+         << "    -i, --infile=FILE     protobuf data input [" << DEF_INFILE << "]" << endl
          << "    -u, --dump            pretty print the schema to stderr" << endl
         ;
 }
@@ -54,6 +57,7 @@ parse_arguments(int & argc, char ** & argv)
             {"protodir",                required_argument,  0, 'd'},
             {"protofile",               required_argument,  0, 'p'},
             {"rootmsg",                 required_argument,  0, 'm'},
+            {"infile",                  required_argument,  0, 'i'},
             {"dump",                    no_argument,        0, 'u'},
             {0, 0, 0, 0}
         };
@@ -61,7 +65,7 @@ parse_arguments(int & argc, char ** & argv)
     while (true)
     {
         int optndx = 0;
-        int opt = getopt_long(argc, argv, "hd:p:m:u",
+        int opt = getopt_long(argc, argv, "hd:p:m:i:u",
                               long_options, &optndx);
 
         // Are we done processing arguments?
@@ -84,6 +88,10 @@ parse_arguments(int & argc, char ** & argv)
 
         case 'm':
             g_rootmsg = optarg;
+            break;
+
+        case 'i':
+            g_infile = optarg;
             break;
 
         case 'u':
@@ -123,8 +131,13 @@ int run(int & argc, char ** & argv)
     google::InitGoogleLogging(argv[0]);
     parse_arguments(argc, argv);
     Schema schema(g_protodir, g_protofile, g_rootmsg);
+
     if (g_dodump)
         schema.dump(cerr);
+
+    if (!g_infile.empty())
+        schema.convert(g_infile);
+    
     return 0;
 }
     
