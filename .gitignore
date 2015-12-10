@@ -16,6 +16,7 @@ avro-parquet-encoder
 protobuf-parquet-encoder
 cppparquet
 parquet-file-test
+pb_sample
 
 *-golden
 

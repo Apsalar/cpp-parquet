@@ -97,7 +97,6 @@ class MyErrorCollector : public MultiFileErrorCollector
              << ':' << column
              << ':' << message << endl;
     }
-
 };
     
 } // end namespace

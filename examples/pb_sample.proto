@@ -1,21 +1,21 @@
-package sample;
+package pb_sample;
 
 message Document {
     required int64 DocId = 1;
 
-    message links {
+    message mlinks {
         repeated int64 Backward = 1;
         repeated int64 Forward = 2;
     }
-    optional links Links = 2;
+    optional mlinks Links = 2;
 
-    message name {
-        message language {
+    message mname {
+        message mlanguage {
             required string Code = 1;
             optional string Country = 2;
         }
-        repeated language Language = 1;
+        repeated mlanguage Language = 1;
         optional string Url = 2;
     }
-    repeated name Name = 3;
+    repeated mname Name = 3;
 }
