@@ -19,6 +19,8 @@ using namespace std;
 
 using namespace google::protobuf;
 
+using namespace protobuf_schema_walker;
+
 namespace {
 
 char const * DEF_PROTODIR = "./";

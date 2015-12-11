@@ -6,21 +6,57 @@
 
 #pragma once
 
-#include <string>
-#include <ostream>
 #include <iostream>
+#include <ostream>
+#include <string>
+#include <vector>
 
 #include <google/protobuf/compiler/importer.h>
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/dynamic_message.h>
 
-class FieldTraverser
+#include <parquet-file/parquet-column.h>
+
+namespace protobuf_schema_walker {
+
+typedef std::vector<std::string> StringSeq;
+
+class SchemaNode;
+typedef std::vector<SchemaNode *> SchemaNodeSeq;
+
+class NodeTraverser;
+
+class SchemaNode {
+public:
+    // "Group" node (has children, no type)
+    SchemaNode(StringSeq const & i_name,
+               google::protobuf::Descriptor const * i_dp)
+        : m_name(i_name)
+        , m_dp(i_dp)
+        , m_fdp(NULL)
+    {}
+
+    // "Leaf" node (no children, has type)
+    SchemaNode(StringSeq const & i_name,
+               google::protobuf::FieldDescriptor const * i_fdp)
+        : m_name(i_name)
+        , m_dp(NULL)
+        , m_fdp(i_fdp)
+    {}
+
+    void traverse(NodeTraverser & nt);
+
+    StringSeq								m_name;
+    google::protobuf::Descriptor const *	m_dp;
+    google::protobuf::FieldDescriptor const * m_fdp;
+    parquet_file::ParquetColumn *			m_parqcolp;
+    SchemaNodeSeq							m_children;
+};
+
+class NodeTraverser
 {
 public:
-    typedef std::vector<std::string> PathSeq;
-
-    virtual void visit(PathSeq const & i_path,
-                       google::protobuf::FieldDescriptor const * i_fd) = 0;
+    virtual void visit(SchemaNode const * node) = 0;
 };
 
 class Schema
@@ -35,7 +71,7 @@ public:
     void convert(std::string const & infile);
 
 private:
-    void traverse(FieldTraverser & ft);
+    void traverse(NodeTraverser & nt);
 
     bool process_record(std::istream & istrm);
     
@@ -45,7 +81,11 @@ private:
     google::protobuf::Descriptor const *		m_typep;
     google::protobuf::DynamicMessageFactory		m_dmsgfact;
     google::protobuf::Message const *			m_proto;
+
+    SchemaNode * m_root;
 };
+
+} // end protobuf_schema_walker
 
 // Local Variables:
 // mode: C++

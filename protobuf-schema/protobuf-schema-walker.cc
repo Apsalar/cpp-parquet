@@ -22,10 +22,12 @@ using namespace std;
 using namespace google::protobuf;
 using namespace google::protobuf::compiler;
 
+using namespace protobuf_schema_walker;
+
 namespace {
 
 string
-pathstr(FieldTraverser::PathSeq const & path)
+pathstr(StringSeq const & path)
 {
     ostringstream ostrm;
     for (size_t ndx = 0; ndx < path.size(); ++ndx) {
@@ -50,42 +52,53 @@ repstr(FieldDescriptor const * fd)
         return "???";
 }
 
-class FieldDumper : public FieldTraverser
+class FieldDumper : public NodeTraverser
 {
 public:
     FieldDumper(ostream & ostrm) : m_ostrm(ostrm) {}
 
-    virtual void visit(PathSeq const & i_path,
-                       FieldDescriptor const * i_fd)
+    virtual void visit(SchemaNode const * np)
     {
-        m_ostrm << pathstr(i_path)
-                << ' ' << i_fd->cpp_type_name()
-                << ' ' << repstr(i_fd)
-                << endl;
+        if (np->m_fdp) {
+            m_ostrm << pathstr(np->m_name)
+                    << ' ' << np->m_fdp->cpp_type_name()
+                    << ' ' << repstr(np->m_fdp)
+                    << endl;
+        }
     }
 
 private:
     ostream & m_ostrm;
 };
-    
-void
-traverse_message(FieldTraverser::PathSeq & path,
-                 Descriptor const * dd,
-                 FieldTraverser & ft)
+
+SchemaNode *
+traverse_leaf(StringSeq & path, FieldDescriptor const * fd)
 {
+    SchemaNode * retval = new SchemaNode(path, fd);
+    return retval;
+}
+
+SchemaNode *
+traverse_group(StringSeq & path, Descriptor const * dd)
+{
+    SchemaNode * retval = new SchemaNode(path, dd);
+    
     for (int ndx = 0; ndx < dd->field_count(); ++ndx) {
         FieldDescriptor const * fd = dd->field(ndx);
         path.push_back(fd->name());
         switch (fd->cpp_type()) {
         case FieldDescriptor::CPPTYPE_MESSAGE:
-            traverse_message(path, fd->message_type(), ft);
+            retval->m_children.push_back
+                (traverse_group(path, fd->message_type()));
             break;
         default:
-            ft.visit(path, fd);
+            retval->m_children.push_back(traverse_leaf(path, fd));
             break;
         }
         path.pop_back();
     }
+
+    return retval;
 }
 
 class MyErrorCollector : public MultiFileErrorCollector
@@ -101,8 +114,22 @@ class MyErrorCollector : public MultiFileErrorCollector
              << ':' << message << endl;
     }
 };
-    
+
 } // end namespace
+
+namespace protobuf_schema_walker {
+
+void
+SchemaNode::traverse(NodeTraverser & nt)
+{
+    nt.visit(this);
+    for (SchemaNodeSeq::iterator it = m_children.begin();
+         it != m_children.end();
+         ++it) {
+        SchemaNode * np = *it;
+        np->traverse(nt);
+    }
+}
 
 Schema::Schema(string const & i_protodir,
                string const & i_protofile,
@@ -122,6 +149,9 @@ Schema::Schema(string const & i_protodir,
     }
 
     m_proto = m_dmsgfact.GetPrototype(m_typep);
+
+    StringSeq path;
+    m_root = traverse_group(path, m_typep);
 }
 
 void
@@ -150,10 +180,9 @@ Schema::convert(string const & infile)
 }
 
 void
-Schema::traverse(FieldTraverser & ft)
+Schema::traverse(NodeTraverser & nt)
 {
-    FieldTraverser::PathSeq path;
-    traverse_message(path, m_typep, ft);
+    m_root->traverse(nt);
 }
 
 bool
@@ -180,6 +209,7 @@ Schema::process_record(istream & istrm)
     if (!istrm.good())
         return false;
 
+#if 0    
     Message * inmsg = m_proto->New();
     inmsg->ParseFromString(buffer);
 
@@ -204,6 +234,9 @@ Schema::process_record(istream & istrm)
             cout << "    Url "
                  << name_reflp->GetString(name_msg, url_fd) << endl;
     }
+#endif
     
     return true;
 }
+
+} // end namespace protobuf_schema_walker
