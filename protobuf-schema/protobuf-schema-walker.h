@@ -28,25 +28,30 @@ class NodeTraverser;
 
 class SchemaNode {
 public:
-    // "Group" node (has children, no type)
-    SchemaNode(StringSeq const & i_name,
-               google::protobuf::Descriptor const * i_dp)
-        : m_name(i_name)
-        , m_dp(i_dp)
-        , m_fdp(NULL)
-    {}
-
-    // "Leaf" node (no children, has type)
-    SchemaNode(StringSeq const & i_name,
+    SchemaNode(StringSeq const & i_path,
+               google::protobuf::Descriptor const * i_dp,
                google::protobuf::FieldDescriptor const * i_fdp)
-        : m_name(i_name)
-        , m_dp(NULL)
+        : m_path(i_path)
+        , m_dp(i_dp)
         , m_fdp(i_fdp)
     {}
 
+    std::string const & name() {
+        return m_path.back();
+    }
+    
     void traverse(NodeTraverser & nt);
 
-    StringSeq								m_name;
+    void propagate_message(google::protobuf::Message const * i_msg);
+
+    void propagate_field(google::protobuf::Reflection const * i_reflp,
+                         google::protobuf::Message const * i_msg);
+
+    void propagate_value(google::protobuf::Reflection const * i_reflp,
+                         google::protobuf::Message const * i_msg,
+                         int ndx);
+    
+    StringSeq								m_path;
     google::protobuf::Descriptor const *	m_dp;
     google::protobuf::FieldDescriptor const * m_fdp;
     parquet_file::ParquetColumn *			m_parqcolp;

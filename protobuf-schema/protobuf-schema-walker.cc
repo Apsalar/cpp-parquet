@@ -60,7 +60,7 @@ public:
     virtual void visit(SchemaNode const * np)
     {
         if (np->m_fdp) {
-            m_ostrm << pathstr(np->m_name)
+            m_ostrm << pathstr(np->m_path)
                     << ' ' << np->m_fdp->cpp_type_name()
                     << ' ' << repstr(np->m_fdp)
                     << endl;
@@ -74,22 +74,45 @@ private:
 SchemaNode *
 traverse_leaf(StringSeq & path, FieldDescriptor const * fd)
 {
-    SchemaNode * retval = new SchemaNode(path, fd);
+    SchemaNode * retval = new SchemaNode(path, NULL, fd);
     return retval;
 }
 
 SchemaNode *
-traverse_group(StringSeq & path, Descriptor const * dd)
+traverse_group(StringSeq & path, FieldDescriptor const * i_fd)
 {
-    SchemaNode * retval = new SchemaNode(path, dd);
+    Descriptor const * dd = i_fd->message_type();
+
+    SchemaNode * retval = new SchemaNode(path, dd, i_fd);
     
     for (int ndx = 0; ndx < dd->field_count(); ++ndx) {
         FieldDescriptor const * fd = dd->field(ndx);
         path.push_back(fd->name());
         switch (fd->cpp_type()) {
         case FieldDescriptor::CPPTYPE_MESSAGE:
-            retval->m_children.push_back
-                (traverse_group(path, fd->message_type()));
+            retval->m_children.push_back(traverse_group(path, fd));
+            break;
+        default:
+            retval->m_children.push_back(traverse_leaf(path, fd));
+            break;
+        }
+        path.pop_back();
+    }
+
+    return retval;
+}
+
+SchemaNode *
+traverse_root(StringSeq & path, Descriptor const * dd)
+{
+    SchemaNode * retval = new SchemaNode(path, dd, NULL);
+    
+    for (int ndx = 0; ndx < dd->field_count(); ++ndx) {
+        FieldDescriptor const * fd = dd->field(ndx);
+        path.push_back(fd->name());
+        switch (fd->cpp_type()) {
+        case FieldDescriptor::CPPTYPE_MESSAGE:
+            retval->m_children.push_back(traverse_group(path, fd));
             break;
         default:
             retval->m_children.push_back(traverse_leaf(path, fd));
@@ -131,6 +154,120 @@ SchemaNode::traverse(NodeTraverser & nt)
     }
 }
 
+void
+SchemaNode::propagate_message(Message const * i_msg)
+{
+    Reflection const * reflp =
+        i_msg ? i_msg->GetReflection() : NULL;
+
+    for (SchemaNodeSeq::iterator it = m_children.begin();
+         it != m_children.end();
+         ++it) {
+        SchemaNode * np = *it;
+        np->propagate_field(reflp, i_msg);
+    }
+}
+
+void
+SchemaNode::propagate_field(Reflection const * i_reflp,
+                            Message const * i_msg)
+{
+    if (m_fdp->is_required()) {
+        propagate_value(i_reflp, i_msg, -1);
+    }
+    else if (m_fdp->is_optional()) {
+        if (i_msg != NULL &&
+            i_reflp->HasField(*i_msg, m_fdp)) {
+            propagate_value(i_reflp, i_msg, -1);
+        }
+        else {
+            propagate_value(NULL, NULL, -1);
+        }
+    }
+    else if (m_fdp->is_repeated()) {
+        size_t nvals = i_reflp->FieldSize(*i_msg, m_fdp);
+        if (nvals == 0) {
+            propagate_value(NULL, NULL, -1);
+        }
+        else {
+            for (size_t ndx = 0; ndx < nvals; ++ndx) {
+                propagate_value(i_reflp, i_msg, ndx);
+            }
+        }
+    }
+    else {
+        LOG(FATAL) << "field " << pathstr(m_path)
+                   << " isn't required, optional or repeated";
+    }
+}
+
+void
+SchemaNode::propagate_value(Reflection const * i_reflp,
+                            Message const * i_msg,
+                            int ndx)
+{
+    switch (m_fdp->cpp_type()) {
+    case FieldDescriptor::CPPTYPE_INT32:
+        {
+            if (i_msg == NULL)
+                cerr << pathstr(m_path) << ": " << "NULL" << endl;
+            else {
+                int32_t val = ndx == -1
+                    ? i_reflp->GetInt32(*i_msg, m_fdp)
+                    : i_reflp->GetRepeatedInt32(*i_msg, m_fdp, ndx);
+                cerr << pathstr(m_path) << ": " << val << endl;
+            }
+        }
+        break;
+    case FieldDescriptor::CPPTYPE_INT64:
+        {
+            if (i_msg == NULL)
+                cerr << pathstr(m_path) << ": " << "NULL" << endl;
+            else {
+                int64_t val = ndx == -1
+                    ? i_reflp->GetInt64(*i_msg, m_fdp)
+                    : i_reflp->GetRepeatedInt64(*i_msg, m_fdp, ndx);
+                cerr << pathstr(m_path) << ": " << val << endl;
+            }
+        }
+        break;
+    case FieldDescriptor::CPPTYPE_UINT32:
+    case FieldDescriptor::CPPTYPE_UINT64:
+    case FieldDescriptor::CPPTYPE_DOUBLE:
+    case FieldDescriptor::CPPTYPE_FLOAT:
+    case FieldDescriptor::CPPTYPE_BOOL:
+    case FieldDescriptor::CPPTYPE_ENUM:
+        break;
+    case FieldDescriptor::CPPTYPE_STRING:
+        {
+            if (i_msg == NULL)
+                cerr << pathstr(m_path) << ": " << "NULL" << endl;
+            else {
+                string val = ndx == -1
+                    ? i_reflp->GetString(*i_msg, m_fdp)
+                    : i_reflp->GetRepeatedString(*i_msg, m_fdp, ndx);
+                cerr << pathstr(m_path) << ": " << val << endl;
+            }
+        }
+        break;
+    case FieldDescriptor::CPPTYPE_MESSAGE:
+        {
+            if (i_msg == NULL)
+                propagate_message(NULL);
+            else {
+                Message const & cmsg = ndx == -1
+                    ? i_reflp->GetMessage(*i_msg, m_fdp)
+                    : i_reflp->GetRepeatedMessage(*i_msg, m_fdp, ndx);
+                propagate_message(&cmsg);
+            }
+        }
+        break;
+    default:
+        LOG(FATAL) << "field " << pathstr(m_path)
+                   << " is of unknown type: " << int(m_fdp->cpp_type());
+    }
+}
+
 Schema::Schema(string const & i_protodir,
                string const & i_protofile,
                string const & i_rootmsg)
@@ -151,7 +288,7 @@ Schema::Schema(string const & i_protodir,
     m_proto = m_dmsgfact.GetPrototype(m_typep);
 
     StringSeq path;
-    m_root = traverse_group(path, m_typep);
+    m_root = traverse_root(path, m_typep);
 }
 
 void
@@ -173,6 +310,7 @@ Schema::convert(string const & infile)
     bool more = true;
     while (more) {
         more = process_record(istrm);
+        cerr << endl;
         if (more)
             ++nrecs;
     }
@@ -209,7 +347,12 @@ Schema::process_record(istream & istrm)
     if (!istrm.good())
         return false;
 
-#if 0    
+    Message * inmsg = m_proto->New();
+    inmsg->ParseFromString(buffer);
+
+    m_root->propagate_message(inmsg);
+    
+#if 0
     Message * inmsg = m_proto->New();
     inmsg->ParseFromString(buffer);
 
