@@ -30,10 +30,13 @@ class SchemaNode {
 public:
     SchemaNode(StringSeq const & i_path,
                google::protobuf::Descriptor const * i_dp,
-               google::protobuf::FieldDescriptor const * i_fdp)
+               google::protobuf::FieldDescriptor const * i_fdp,
+               int i_replvl, int i_deflvl)
         : m_path(i_path)
         , m_dp(i_dp)
         , m_fdp(i_fdp)
+        , m_replvl(i_replvl)
+        , m_deflvl(i_deflvl)
     {}
 
     std::string const & name() {
@@ -42,18 +45,23 @@ public:
     
     void traverse(NodeTraverser & nt);
 
-    void propagate_message(google::protobuf::Message const * i_msg);
+    void propagate_message(google::protobuf::Message const * i_msg,
+                           int replvl, int deflvl);
 
     void propagate_field(google::protobuf::Reflection const * i_reflp,
-                         google::protobuf::Message const * i_msg);
+                         google::protobuf::Message const * i_msg,
+                         int replvl, int deflvl);
 
     void propagate_value(google::protobuf::Reflection const * i_reflp,
                          google::protobuf::Message const * i_msg,
-                         int ndx);
+                         int ndx,
+                         int replvl, int deflvl);
     
     StringSeq								m_path;
     google::protobuf::Descriptor const *	m_dp;
     google::protobuf::FieldDescriptor const * m_fdp;
+    int										m_replvl;
+    int										m_deflvl;
     parquet_file::ParquetColumn *			m_parqcolp;
     SchemaNodeSeq							m_children;
 };

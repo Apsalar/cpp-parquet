@@ -72,28 +72,38 @@ private:
 };
 
 SchemaNode *
-traverse_leaf(StringSeq & path, FieldDescriptor const * fd)
+traverse_leaf(StringSeq & path, FieldDescriptor const * i_fd,
+              int i_replvl, int i_deflvl)
 {
-    SchemaNode * retval = new SchemaNode(path, NULL, fd);
+    int replvl = i_fd->is_repeated() ? i_replvl + 1 : i_replvl;
+    int deflvl = i_fd->is_required() ? i_replvl : i_replvl + 1;
+
+    SchemaNode * retval = new SchemaNode(path, NULL, i_fd, replvl, deflvl);
     return retval;
 }
 
 SchemaNode *
-traverse_group(StringSeq & path, FieldDescriptor const * i_fd)
+traverse_group(StringSeq & path, FieldDescriptor const * i_fd,
+               int i_replvl, int i_deflvl)
 {
     Descriptor const * dd = i_fd->message_type();
 
-    SchemaNode * retval = new SchemaNode(path, dd, i_fd);
+    int replvl = i_fd->is_repeated() ? i_replvl + 1 : i_replvl;
+    int deflvl = i_fd->is_required() ? i_replvl : i_replvl + 1;
+
+    SchemaNode * retval = new SchemaNode(path, dd, i_fd, replvl, deflvl);
     
     for (int ndx = 0; ndx < dd->field_count(); ++ndx) {
         FieldDescriptor const * fd = dd->field(ndx);
         path.push_back(fd->name());
         switch (fd->cpp_type()) {
         case FieldDescriptor::CPPTYPE_MESSAGE:
-            retval->m_children.push_back(traverse_group(path, fd));
+            retval->m_children.push_back(traverse_group(path, fd,
+                                                        replvl, deflvl));
             break;
         default:
-            retval->m_children.push_back(traverse_leaf(path, fd));
+            retval->m_children.push_back(traverse_leaf(path, fd,
+                                                       replvl, deflvl));
             break;
         }
         path.pop_back();
@@ -105,17 +115,17 @@ traverse_group(StringSeq & path, FieldDescriptor const * i_fd)
 SchemaNode *
 traverse_root(StringSeq & path, Descriptor const * dd)
 {
-    SchemaNode * retval = new SchemaNode(path, dd, NULL);
+    SchemaNode * retval = new SchemaNode(path, dd, NULL, 0, 0);
     
     for (int ndx = 0; ndx < dd->field_count(); ++ndx) {
         FieldDescriptor const * fd = dd->field(ndx);
         path.push_back(fd->name());
         switch (fd->cpp_type()) {
         case FieldDescriptor::CPPTYPE_MESSAGE:
-            retval->m_children.push_back(traverse_group(path, fd));
+            retval->m_children.push_back(traverse_group(path, fd, 0, 0));
             break;
         default:
-            retval->m_children.push_back(traverse_leaf(path, fd));
+            retval->m_children.push_back(traverse_leaf(path, fd, 0, 0));
             break;
         }
         path.pop_back();
@@ -155,7 +165,8 @@ SchemaNode::traverse(NodeTraverser & nt)
 }
 
 void
-SchemaNode::propagate_message(Message const * i_msg)
+SchemaNode::propagate_message(Message const * i_msg,
+                              int replvl, int deflvl)
 {
     Reflection const * reflp =
         i_msg ? i_msg->GetReflection() : NULL;
@@ -164,34 +175,38 @@ SchemaNode::propagate_message(Message const * i_msg)
          it != m_children.end();
          ++it) {
         SchemaNode * np = *it;
-        np->propagate_field(reflp, i_msg);
+        np->propagate_field(reflp, i_msg, replvl, deflvl);
     }
 }
 
 void
 SchemaNode::propagate_field(Reflection const * i_reflp,
-                            Message const * i_msg)
+                            Message const * i_msg,
+                            int replvl, int deflvl)
 {
     if (m_fdp->is_required()) {
-        propagate_value(i_reflp, i_msg, -1);
+        propagate_value(i_reflp, i_msg, -1, replvl, deflvl);
     }
     else if (m_fdp->is_optional()) {
         if (i_msg != NULL &&
             i_reflp->HasField(*i_msg, m_fdp)) {
-            propagate_value(i_reflp, i_msg, -1);
+            propagate_value(i_reflp, i_msg, -1, replvl, deflvl+1);
         }
         else {
-            propagate_value(NULL, NULL, -1);
+            propagate_value(NULL, NULL, -1, replvl, deflvl);
         }
     }
     else if (m_fdp->is_repeated()) {
         size_t nvals = i_reflp->FieldSize(*i_msg, m_fdp);
         if (nvals == 0) {
-            propagate_value(NULL, NULL, -1);
+            propagate_value(NULL, NULL, -1, replvl, deflvl);
         }
         else {
             for (size_t ndx = 0; ndx < nvals; ++ndx) {
-                propagate_value(i_reflp, i_msg, ndx);
+                if (ndx == 0)
+                    propagate_value(i_reflp, i_msg, ndx, replvl, deflvl+1);
+                else
+                    propagate_value(i_reflp, i_msg, ndx, m_replvl, deflvl+1);
             }
         }
     }
@@ -204,30 +219,47 @@ SchemaNode::propagate_field(Reflection const * i_reflp,
 void
 SchemaNode::propagate_value(Reflection const * i_reflp,
                             Message const * i_msg,
-                            int ndx)
+                            int ndx,
+                            int i_replvl, int deflvl)
 {
+    int replvl = ndx == 0 ? 0 : i_replvl;
+
+#if 0
+    cerr << pathstr(m_path) << ": "
+         << ", R:" << replvl << ", D:" << deflvl
+         << endl;
+#endif
+    
     switch (m_fdp->cpp_type()) {
     case FieldDescriptor::CPPTYPE_INT32:
         {
             if (i_msg == NULL)
-                cerr << pathstr(m_path) << ": " << "NULL" << endl;
+                cerr << pathstr(m_path) << ": " << "NULL"
+                     << ", R:" << replvl << ", D:" << deflvl
+                     << endl;
             else {
                 int32_t val = ndx == -1
                     ? i_reflp->GetInt32(*i_msg, m_fdp)
                     : i_reflp->GetRepeatedInt32(*i_msg, m_fdp, ndx);
-                cerr << pathstr(m_path) << ": " << val << endl;
+                cerr << pathstr(m_path) << ": " << val
+                     << ", R:" << replvl << ", D:" << deflvl
+                     << endl;
             }
         }
         break;
     case FieldDescriptor::CPPTYPE_INT64:
         {
             if (i_msg == NULL)
-                cerr << pathstr(m_path) << ": " << "NULL" << endl;
+                cerr << pathstr(m_path) << ": " << "NULL"
+                     << ", R:" << replvl << ", D:" << deflvl
+                     << endl;
             else {
                 int64_t val = ndx == -1
                     ? i_reflp->GetInt64(*i_msg, m_fdp)
                     : i_reflp->GetRepeatedInt64(*i_msg, m_fdp, ndx);
-                cerr << pathstr(m_path) << ": " << val << endl;
+                cerr << pathstr(m_path) << ": " << val
+                     << ", R:" << replvl << ", D:" << deflvl
+                     << endl;
             }
         }
         break;
@@ -241,24 +273,28 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
     case FieldDescriptor::CPPTYPE_STRING:
         {
             if (i_msg == NULL)
-                cerr << pathstr(m_path) << ": " << "NULL" << endl;
+                cerr << pathstr(m_path) << ": " << "NULL"
+                     << ", R:" << replvl << ", D:" << deflvl
+                     << endl;
             else {
                 string val = ndx == -1
                     ? i_reflp->GetString(*i_msg, m_fdp)
                     : i_reflp->GetRepeatedString(*i_msg, m_fdp, ndx);
-                cerr << pathstr(m_path) << ": " << val << endl;
+                cerr << pathstr(m_path) << ": " << val
+                     << ", R:" << replvl << ", D:" << deflvl
+                     << endl;
             }
         }
         break;
     case FieldDescriptor::CPPTYPE_MESSAGE:
         {
             if (i_msg == NULL)
-                propagate_message(NULL);
+                propagate_message(NULL, replvl, deflvl);
             else {
                 Message const & cmsg = ndx == -1
                     ? i_reflp->GetMessage(*i_msg, m_fdp)
                     : i_reflp->GetRepeatedMessage(*i_msg, m_fdp, ndx);
-                propagate_message(&cmsg);
+                propagate_message(&cmsg, i_replvl, deflvl);
             }
         }
         break;
@@ -296,6 +332,7 @@ Schema::dump(ostream & ostrm)
 {
     FieldDumper fdump(ostrm);
     traverse(fdump);
+    ostrm << endl;
 }
 
 void
@@ -350,34 +387,7 @@ Schema::process_record(istream & istrm)
     Message * inmsg = m_proto->New();
     inmsg->ParseFromString(buffer);
 
-    m_root->propagate_message(inmsg);
-    
-#if 0
-    Message * inmsg = m_proto->New();
-    inmsg->ParseFromString(buffer);
-
-    FieldDescriptor const * docid_fd = m_typep->FindFieldByName("DocId");
-    FieldDescriptor const * name_fd = m_typep->FindFieldByName("Name");
-
-    Reflection const * reflp = inmsg->GetReflection();
-
-    cout << "DocId " << reflp->GetInt64(*inmsg, docid_fd) << endl;
-
-    size_t nnames = reflp->FieldSize(*inmsg, name_fd);
-    for (size_t ndx = 0; ndx < nnames; ++ndx) {
-        Message const & name_msg =
-            reflp->GetRepeatedMessage(*inmsg, name_fd, ndx);
-
-        Reflection const * name_reflp = name_msg.GetReflection();
-
-        FieldDescriptor const * url_fd =
-            name_msg.GetDescriptor()->FindFieldByName("Url");
-
-        if (name_reflp->HasField(name_msg, url_fd))
-            cout << "    Url "
-                 << name_reflp->GetString(name_msg, url_fd) << endl;
-    }
-#endif
+    m_root->propagate_message(inmsg, 0, 0);
     
     return true;
 }
