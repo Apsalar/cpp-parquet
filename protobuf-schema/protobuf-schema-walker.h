@@ -31,12 +31,11 @@ public:
     SchemaNode(StringSeq const & i_path,
                google::protobuf::Descriptor const * i_dp,
                google::protobuf::FieldDescriptor const * i_fdp,
-               int i_replvl, int i_deflvl)
+               int i_replvl)
         : m_path(i_path)
         , m_dp(i_dp)
         , m_fdp(i_fdp)
         , m_replvl(i_replvl)
-        , m_deflvl(i_deflvl)
     {}
 
     std::string const & name() {
@@ -61,7 +60,6 @@ public:
     google::protobuf::Descriptor const *	m_dp;
     google::protobuf::FieldDescriptor const * m_fdp;
     int										m_replvl;
-    int										m_deflvl;
     parquet_file::ParquetColumn *			m_parqcolp;
     SchemaNodeSeq							m_children;
 };

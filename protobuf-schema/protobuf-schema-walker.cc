@@ -72,38 +72,32 @@ private:
 };
 
 SchemaNode *
-traverse_leaf(StringSeq & path, FieldDescriptor const * i_fd,
-              int i_replvl, int i_deflvl)
+traverse_leaf(StringSeq & path, FieldDescriptor const * i_fd, int i_replvl)
 {
     int replvl = i_fd->is_repeated() ? i_replvl + 1 : i_replvl;
-    int deflvl = i_fd->is_required() ? i_replvl : i_replvl + 1;
 
-    SchemaNode * retval = new SchemaNode(path, NULL, i_fd, replvl, deflvl);
+    SchemaNode * retval = new SchemaNode(path, NULL, i_fd, replvl);
     return retval;
 }
 
 SchemaNode *
-traverse_group(StringSeq & path, FieldDescriptor const * i_fd,
-               int i_replvl, int i_deflvl)
+traverse_group(StringSeq & path, FieldDescriptor const * i_fd, int i_replvl)
 {
     Descriptor const * dd = i_fd->message_type();
 
     int replvl = i_fd->is_repeated() ? i_replvl + 1 : i_replvl;
-    int deflvl = i_fd->is_required() ? i_replvl : i_replvl + 1;
 
-    SchemaNode * retval = new SchemaNode(path, dd, i_fd, replvl, deflvl);
+    SchemaNode * retval = new SchemaNode(path, dd, i_fd, replvl);
     
     for (int ndx = 0; ndx < dd->field_count(); ++ndx) {
         FieldDescriptor const * fd = dd->field(ndx);
         path.push_back(fd->name());
         switch (fd->cpp_type()) {
         case FieldDescriptor::CPPTYPE_MESSAGE:
-            retval->m_children.push_back(traverse_group(path, fd,
-                                                        replvl, deflvl));
+            retval->m_children.push_back(traverse_group(path, fd, replvl));
             break;
         default:
-            retval->m_children.push_back(traverse_leaf(path, fd,
-                                                       replvl, deflvl));
+            retval->m_children.push_back(traverse_leaf(path, fd, replvl));
             break;
         }
         path.pop_back();
@@ -115,17 +109,17 @@ traverse_group(StringSeq & path, FieldDescriptor const * i_fd,
 SchemaNode *
 traverse_root(StringSeq & path, Descriptor const * dd)
 {
-    SchemaNode * retval = new SchemaNode(path, dd, NULL, 0, 0);
+    SchemaNode * retval = new SchemaNode(path, dd, NULL, 0);
     
     for (int ndx = 0; ndx < dd->field_count(); ++ndx) {
         FieldDescriptor const * fd = dd->field(ndx);
         path.push_back(fd->name());
         switch (fd->cpp_type()) {
         case FieldDescriptor::CPPTYPE_MESSAGE:
-            retval->m_children.push_back(traverse_group(path, fd, 0, 0));
+            retval->m_children.push_back(traverse_group(path, fd, 0));
             break;
         default:
-            retval->m_children.push_back(traverse_leaf(path, fd, 0, 0));
+            retval->m_children.push_back(traverse_leaf(path, fd, 0));
             break;
         }
         path.pop_back();
