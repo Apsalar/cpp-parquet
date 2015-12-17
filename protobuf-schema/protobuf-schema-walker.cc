@@ -318,18 +318,28 @@ SchemaNode::propagate_field(Reflection const * i_reflp,
             propagate_value(i_reflp, i_msg, -1, replvl, deflvl+1);
         }
         else {
+            if (m_fdp->cpp_type() == FieldDescriptor::CPPTYPE_MESSAGE) {
+                propagate_message(NULL, replvl, deflvl);
+            }
+            else {
+                if (m_dotrace) {
+                    cerr << pathstr(m_path) << ": " << "NULL"
+                         << ", R:" << replvl << ", D:" << deflvl
+                         << endl;
+                }
+                m_parqcolp->AddNulls(replvl, deflvl, 1);
+            }
+        }
+    }
+    else if (m_fdp->is_repeated()) {
+        size_t nvals = i_reflp->FieldSize(*i_msg, m_fdp);
+        if (nvals == 0) {
             if (m_dotrace) {
                 cerr << pathstr(m_path) << ": " << "NULL"
                      << ", R:" << replvl << ", D:" << deflvl
                      << endl;
             }
             m_parqcolp->AddNulls(replvl, deflvl, 1);
-        }
-    }
-    else if (m_fdp->is_repeated()) {
-        size_t nvals = i_reflp->FieldSize(*i_msg, m_fdp);
-        if (nvals == 0) {
-            propagate_value(NULL, NULL, -1, replvl, deflvl);
         }
         else {
             for (size_t ndx = 0; ndx < nvals; ++ndx) {
@@ -363,155 +373,85 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
     switch (m_fdp->cpp_type()) {
     case FieldDescriptor::CPPTYPE_INT32:
         {
-            if (i_msg == NULL) {
-                if (m_dotrace) {
-                    cerr << pathstr(m_path) << ": " << "NULL"
-                         << ", R:" << replvl << ", D:" << deflvl
-                         << endl;
-                }
-                m_parqcolp->AddNulls(replvl, deflvl, 1);
-            }
-            else {
-                int32_t val = ndx == -1
-                    ? i_reflp->GetInt32(*i_msg, m_fdp)
-                    : i_reflp->GetRepeatedInt32(*i_msg, m_fdp, ndx);
-                if (m_dotrace) {
-                    cerr << pathstr(m_path) << ": " << val
-                         << ", R:" << replvl << ", D:" << deflvl
-                         << endl;
-                }
+            int32_t val = ndx == -1
+                ? i_reflp->GetInt32(*i_msg, m_fdp)
+                : i_reflp->GetRepeatedInt32(*i_msg, m_fdp, ndx);
+            if (m_dotrace) {
+                cerr << pathstr(m_path) << ": " << val
+                     << ", R:" << replvl << ", D:" << deflvl
+                     << endl;
             }
         }
         break;
     case FieldDescriptor::CPPTYPE_INT64:
         {
-            if (i_msg == NULL) {
-                if (m_dotrace) {
-                    cerr << pathstr(m_path) << ": " << "NULL"
-                         << ", R:" << replvl << ", D:" << deflvl
-                         << endl;
-                }
-                m_parqcolp->AddNulls(replvl, deflvl, 1);
-            }
-            else {
-                int64_t val = ndx == -1
-                    ? i_reflp->GetInt64(*i_msg, m_fdp)
-                    : i_reflp->GetRepeatedInt64(*i_msg, m_fdp, ndx);
-                if (m_dotrace) {
-                    cerr << pathstr(m_path) << ": " << val
-                         << ", R:" << replvl << ", D:" << deflvl
-                         << endl;
-                }
+            int64_t val = ndx == -1
+                ? i_reflp->GetInt64(*i_msg, m_fdp)
+                : i_reflp->GetRepeatedInt64(*i_msg, m_fdp, ndx);
+            if (m_dotrace) {
+                cerr << pathstr(m_path) << ": " << val
+                     << ", R:" << replvl << ", D:" << deflvl
+                     << endl;
             }
         }
         break;
     case FieldDescriptor::CPPTYPE_UINT32:
         {
-            if (i_msg == NULL) {
-                if (m_dotrace) {
-                    cerr << pathstr(m_path) << ": " << "NULL"
-                         << ", R:" << replvl << ", D:" << deflvl
-                         << endl;
-                }
-                m_parqcolp->AddNulls(replvl, deflvl, 1);
-            }
-            else {
-                uint32_t val = ndx == -1
-                    ? i_reflp->GetUInt32(*i_msg, m_fdp)
-                    : i_reflp->GetRepeatedUInt32(*i_msg, m_fdp, ndx);
-                if (m_dotrace) {
-                    cerr << pathstr(m_path) << ": " << val
-                         << ", R:" << replvl << ", D:" << deflvl
-                         << endl;
-                }
+            uint32_t val = ndx == -1
+                ? i_reflp->GetUInt32(*i_msg, m_fdp)
+                : i_reflp->GetRepeatedUInt32(*i_msg, m_fdp, ndx);
+            if (m_dotrace) {
+                cerr << pathstr(m_path) << ": " << val
+                     << ", R:" << replvl << ", D:" << deflvl
+                     << endl;
             }
         }
         break;
     case FieldDescriptor::CPPTYPE_UINT64:
         {
-            if (i_msg == NULL) {
-                if (m_dotrace) {
-                    cerr << pathstr(m_path) << ": " << "NULL"
-                         << ", R:" << replvl << ", D:" << deflvl
-                         << endl;
-                }
-                m_parqcolp->AddNulls(replvl, deflvl, 1);
-            }
-            else {
-                uint64_t val = ndx == -1
-                    ? i_reflp->GetUInt64(*i_msg, m_fdp)
-                    : i_reflp->GetRepeatedUInt64(*i_msg, m_fdp, ndx);
-                if (m_dotrace) {
-                    cerr << pathstr(m_path) << ": " << val
-                         << ", R:" << replvl << ", D:" << deflvl
-                         << endl;
-                }
+            uint64_t val = ndx == -1
+                ? i_reflp->GetUInt64(*i_msg, m_fdp)
+                : i_reflp->GetRepeatedUInt64(*i_msg, m_fdp, ndx);
+            if (m_dotrace) {
+                cerr << pathstr(m_path) << ": " << val
+                     << ", R:" << replvl << ", D:" << deflvl
+                     << endl;
             }
         }
         break;
     case FieldDescriptor::CPPTYPE_DOUBLE:
         {
-            if (i_msg == NULL) {
-                if (m_dotrace) {
-                    cerr << pathstr(m_path) << ": " << "NULL"
-                         << ", R:" << replvl << ", D:" << deflvl
-                         << endl;
-                }
-                m_parqcolp->AddNulls(replvl, deflvl, 1);
-            }
-            else {
-                double val = ndx == -1
-                    ? i_reflp->GetDouble(*i_msg, m_fdp)
-                    : i_reflp->GetRepeatedDouble(*i_msg, m_fdp, ndx);
-                if (m_dotrace) {
-                    cerr << pathstr(m_path) << ": " << val
-                         << ", R:" << replvl << ", D:" << deflvl
-                         << endl;
-                }
+            double val = ndx == -1
+                ? i_reflp->GetDouble(*i_msg, m_fdp)
+                : i_reflp->GetRepeatedDouble(*i_msg, m_fdp, ndx);
+            if (m_dotrace) {
+                cerr << pathstr(m_path) << ": " << val
+                     << ", R:" << replvl << ", D:" << deflvl
+                     << endl;
             }
         }
         break;
     case FieldDescriptor::CPPTYPE_FLOAT:
         {
-            if (i_msg == NULL) {
-                if (m_dotrace) {
-                    cerr << pathstr(m_path) << ": " << "NULL"
-                         << ", R:" << replvl << ", D:" << deflvl
-                         << endl;
-                }
-                m_parqcolp->AddNulls(replvl, deflvl, 1);
-            }
-            else {
-                float val = ndx == -1
-                    ? i_reflp->GetFloat(*i_msg, m_fdp)
-                    : i_reflp->GetRepeatedFloat(*i_msg, m_fdp, ndx);
-                if (m_dotrace) {
-                    cerr << pathstr(m_path) << ": " << val
-                         << ", R:" << replvl << ", D:" << deflvl
-                         << endl;
-                }
+            float val = ndx == -1
+                ? i_reflp->GetFloat(*i_msg, m_fdp)
+                : i_reflp->GetRepeatedFloat(*i_msg, m_fdp, ndx);
+            if (m_dotrace) {
+                cerr << pathstr(m_path) << ": " << val
+                     << ", R:" << replvl << ", D:" << deflvl
+                     << endl;
             }
         }
         break;
     case FieldDescriptor::CPPTYPE_BOOL:
         {
-            if (i_msg == NULL) {
-                if (m_dotrace) {
-                    cerr << pathstr(m_path) << ": " << "NULL"
-                         << ", R:" << replvl << ", D:" << deflvl
-                         << endl;
-                }
-                m_parqcolp->AddNulls(replvl, deflvl, 1);
-            }
-            else {
-                bool val = ndx == -1
-                    ? i_reflp->GetBool(*i_msg, m_fdp)
-                    : i_reflp->GetRepeatedBool(*i_msg, m_fdp, ndx);
-                if (m_dotrace) {
-                    cerr << pathstr(m_path) << ": " << val
-                         << ", R:" << replvl << ", D:" << deflvl
-                         << endl;
-                }
+            bool val = ndx == -1
+                ? i_reflp->GetBool(*i_msg, m_fdp)
+                : i_reflp->GetRepeatedBool(*i_msg, m_fdp, ndx);
+            if (m_dotrace) {
+                cerr << pathstr(m_path) << ": " << val
+                     << ", R:" << replvl << ", D:" << deflvl
+                     << endl;
             }
         }
         break;
@@ -521,36 +461,22 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
         break;
     case FieldDescriptor::CPPTYPE_STRING:
         {
-            if (i_msg == NULL) {
-                if (m_dotrace) {
-                    cerr << pathstr(m_path) << ": " << "NULL"
-                         << ", R:" << replvl << ", D:" << deflvl
-                         << endl;
-                }
-                m_parqcolp->AddNulls(replvl, deflvl, 1);
-            }
-            else {
-                string val = ndx == -1
-                    ? i_reflp->GetString(*i_msg, m_fdp)
-                    : i_reflp->GetRepeatedString(*i_msg, m_fdp, ndx);
-                if (m_dotrace) {
-                    cerr << pathstr(m_path) << ": " << val
-                         << ", R:" << replvl << ", D:" << deflvl
-                         << endl;
-                }
+            string val = ndx == -1
+                ? i_reflp->GetString(*i_msg, m_fdp)
+                : i_reflp->GetRepeatedString(*i_msg, m_fdp, ndx);
+            if (m_dotrace) {
+                cerr << pathstr(m_path) << ": " << val
+                     << ", R:" << replvl << ", D:" << deflvl
+                     << endl;
             }
         }
         break;
     case FieldDescriptor::CPPTYPE_MESSAGE:
         {
-            if (i_msg == NULL)
-                propagate_message(NULL, replvl, deflvl);
-            else {
-                Message const & cmsg = ndx == -1
-                    ? i_reflp->GetMessage(*i_msg, m_fdp)
-                    : i_reflp->GetRepeatedMessage(*i_msg, m_fdp, ndx);
-                propagate_message(&cmsg, i_replvl, deflvl);
-            }
+            Message const & cmsg = ndx == -1
+                ? i_reflp->GetMessage(*i_msg, m_fdp)
+                : i_reflp->GetRepeatedMessage(*i_msg, m_fdp, ndx);
+            propagate_message(&cmsg, i_replvl, deflvl);
         }
         break;
     default:
