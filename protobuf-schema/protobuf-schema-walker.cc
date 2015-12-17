@@ -276,13 +276,113 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
         }
         break;
     case FieldDescriptor::CPPTYPE_UINT32:
+        {
+            if (i_msg == NULL) {
+                if (m_dotrace) {
+                    cerr << pathstr(m_path) << ": " << "NULL"
+                         << ", R:" << replvl << ", D:" << deflvl
+                         << endl;
+                }
+            }
+            else {
+                uint32_t val = ndx == -1
+                    ? i_reflp->GetUInt32(*i_msg, m_fdp)
+                    : i_reflp->GetRepeatedUInt32(*i_msg, m_fdp, ndx);
+                if (m_dotrace) {
+                    cerr << pathstr(m_path) << ": " << val
+                         << ", R:" << replvl << ", D:" << deflvl
+                         << endl;
+                }
+            }
+        }
+        break;
     case FieldDescriptor::CPPTYPE_UINT64:
+        {
+            if (i_msg == NULL) {
+                if (m_dotrace) {
+                    cerr << pathstr(m_path) << ": " << "NULL"
+                         << ", R:" << replvl << ", D:" << deflvl
+                         << endl;
+                }
+            }
+            else {
+                uint64_t val = ndx == -1
+                    ? i_reflp->GetUInt64(*i_msg, m_fdp)
+                    : i_reflp->GetRepeatedUInt64(*i_msg, m_fdp, ndx);
+                if (m_dotrace) {
+                    cerr << pathstr(m_path) << ": " << val
+                         << ", R:" << replvl << ", D:" << deflvl
+                         << endl;
+                }
+            }
+        }
+        break;
     case FieldDescriptor::CPPTYPE_DOUBLE:
+        {
+            if (i_msg == NULL) {
+                if (m_dotrace) {
+                    cerr << pathstr(m_path) << ": " << "NULL"
+                         << ", R:" << replvl << ", D:" << deflvl
+                         << endl;
+                }
+            }
+            else {
+                double val = ndx == -1
+                    ? i_reflp->GetDouble(*i_msg, m_fdp)
+                    : i_reflp->GetRepeatedDouble(*i_msg, m_fdp, ndx);
+                if (m_dotrace) {
+                    cerr << pathstr(m_path) << ": " << val
+                         << ", R:" << replvl << ", D:" << deflvl
+                         << endl;
+                }
+            }
+        }
+        break;
     case FieldDescriptor::CPPTYPE_FLOAT:
+        {
+            if (i_msg == NULL) {
+                if (m_dotrace) {
+                    cerr << pathstr(m_path) << ": " << "NULL"
+                         << ", R:" << replvl << ", D:" << deflvl
+                         << endl;
+                }
+            }
+            else {
+                float val = ndx == -1
+                    ? i_reflp->GetFloat(*i_msg, m_fdp)
+                    : i_reflp->GetRepeatedFloat(*i_msg, m_fdp, ndx);
+                if (m_dotrace) {
+                    cerr << pathstr(m_path) << ": " << val
+                         << ", R:" << replvl << ", D:" << deflvl
+                         << endl;
+                }
+            }
+        }
+        break;
     case FieldDescriptor::CPPTYPE_BOOL:
+        {
+            if (i_msg == NULL) {
+                if (m_dotrace) {
+                    cerr << pathstr(m_path) << ": " << "NULL"
+                         << ", R:" << replvl << ", D:" << deflvl
+                         << endl;
+                }
+            }
+            else {
+                bool val = ndx == -1
+                    ? i_reflp->GetBool(*i_msg, m_fdp)
+                    : i_reflp->GetRepeatedBool(*i_msg, m_fdp, ndx);
+                if (m_dotrace) {
+                    cerr << pathstr(m_path) << ": " << val
+                         << ", R:" << replvl << ", D:" << deflvl
+                         << endl;
+                }
+            }
+        }
+        break;
     case FieldDescriptor::CPPTYPE_ENUM:
         LOG(FATAL) << "field " << pathstr(m_path)
-                   << " is of unknown type: " << int(m_fdp->cpp_type());
+                   << " is of unknown type: " << m_fdp->cpp_type_name();
         break;
     case FieldDescriptor::CPPTYPE_STRING:
         {
