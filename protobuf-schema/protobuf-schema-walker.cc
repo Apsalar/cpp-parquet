@@ -72,32 +72,40 @@ private:
 };
 
 SchemaNode *
-traverse_leaf(StringSeq & path, FieldDescriptor const * i_fd, int i_replvl)
+traverse_leaf(StringSeq & path,
+              FieldDescriptor const * i_fd,
+              int i_replvl,
+              bool i_dotrace)
 {
     int replvl = i_fd->is_repeated() ? i_replvl + 1 : i_replvl;
 
-    SchemaNode * retval = new SchemaNode(path, NULL, i_fd, replvl);
+    SchemaNode * retval = new SchemaNode(path, NULL, i_fd, replvl, i_dotrace);
     return retval;
 }
 
 SchemaNode *
-traverse_group(StringSeq & path, FieldDescriptor const * i_fd, int i_replvl)
+traverse_group(StringSeq & path,
+               FieldDescriptor const * i_fd,
+               int i_replvl,
+               bool i_dotrace)
 {
     Descriptor const * dd = i_fd->message_type();
 
     int replvl = i_fd->is_repeated() ? i_replvl + 1 : i_replvl;
 
-    SchemaNode * retval = new SchemaNode(path, dd, i_fd, replvl);
+    SchemaNode * retval = new SchemaNode(path, dd, i_fd, replvl, i_dotrace);
     
     for (int ndx = 0; ndx < dd->field_count(); ++ndx) {
         FieldDescriptor const * fd = dd->field(ndx);
         path.push_back(fd->name());
         switch (fd->cpp_type()) {
         case FieldDescriptor::CPPTYPE_MESSAGE:
-            retval->m_children.push_back(traverse_group(path, fd, replvl));
+            retval->m_children.push_back(traverse_group(path, fd, replvl,
+                                                        i_dotrace));
             break;
         default:
-            retval->m_children.push_back(traverse_leaf(path, fd, replvl));
+            retval->m_children.push_back(traverse_leaf(path, fd, replvl,
+                                                       i_dotrace));
             break;
         }
         path.pop_back();
@@ -107,19 +115,19 @@ traverse_group(StringSeq & path, FieldDescriptor const * i_fd, int i_replvl)
 }
 
 SchemaNode *
-traverse_root(StringSeq & path, Descriptor const * dd)
+traverse_root(StringSeq & path, Descriptor const * dd, bool dotrace)
 {
-    SchemaNode * retval = new SchemaNode(path, dd, NULL, 0);
+    SchemaNode * retval = new SchemaNode(path, dd, NULL, 0, dotrace);
     
     for (int ndx = 0; ndx < dd->field_count(); ++ndx) {
         FieldDescriptor const * fd = dd->field(ndx);
         path.push_back(fd->name());
         switch (fd->cpp_type()) {
         case FieldDescriptor::CPPTYPE_MESSAGE:
-            retval->m_children.push_back(traverse_group(path, fd, 0));
+            retval->m_children.push_back(traverse_group(path, fd, 0, dotrace));
             break;
         default:
-            retval->m_children.push_back(traverse_leaf(path, fd, 0));
+            retval->m_children.push_back(traverse_leaf(path, fd, 0, dotrace));
             break;
         }
         path.pop_back();
@@ -227,33 +235,43 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
     switch (m_fdp->cpp_type()) {
     case FieldDescriptor::CPPTYPE_INT32:
         {
-            if (i_msg == NULL)
-                cerr << pathstr(m_path) << ": " << "NULL"
-                     << ", R:" << replvl << ", D:" << deflvl
-                     << endl;
+            if (i_msg == NULL) {
+                if (m_dotrace) {
+                    cerr << pathstr(m_path) << ": " << "NULL"
+                         << ", R:" << replvl << ", D:" << deflvl
+                         << endl;
+                }
+            }
             else {
                 int32_t val = ndx == -1
                     ? i_reflp->GetInt32(*i_msg, m_fdp)
                     : i_reflp->GetRepeatedInt32(*i_msg, m_fdp, ndx);
-                cerr << pathstr(m_path) << ": " << val
-                     << ", R:" << replvl << ", D:" << deflvl
-                     << endl;
+                if (m_dotrace) {
+                    cerr << pathstr(m_path) << ": " << val
+                         << ", R:" << replvl << ", D:" << deflvl
+                         << endl;
+                }
             }
         }
         break;
     case FieldDescriptor::CPPTYPE_INT64:
         {
-            if (i_msg == NULL)
-                cerr << pathstr(m_path) << ": " << "NULL"
-                     << ", R:" << replvl << ", D:" << deflvl
-                     << endl;
+            if (i_msg == NULL) {
+                if (m_dotrace) {
+                    cerr << pathstr(m_path) << ": " << "NULL"
+                         << ", R:" << replvl << ", D:" << deflvl
+                         << endl;
+                }
+            }
             else {
                 int64_t val = ndx == -1
                     ? i_reflp->GetInt64(*i_msg, m_fdp)
                     : i_reflp->GetRepeatedInt64(*i_msg, m_fdp, ndx);
-                cerr << pathstr(m_path) << ": " << val
-                     << ", R:" << replvl << ", D:" << deflvl
-                     << endl;
+                if (m_dotrace) {
+                    cerr << pathstr(m_path) << ": " << val
+                         << ", R:" << replvl << ", D:" << deflvl
+                         << endl;
+                }
             }
         }
         break;
@@ -266,17 +284,22 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
         break;
     case FieldDescriptor::CPPTYPE_STRING:
         {
-            if (i_msg == NULL)
-                cerr << pathstr(m_path) << ": " << "NULL"
-                     << ", R:" << replvl << ", D:" << deflvl
-                     << endl;
+            if (i_msg == NULL) {
+                if (m_dotrace) {
+                    cerr << pathstr(m_path) << ": " << "NULL"
+                         << ", R:" << replvl << ", D:" << deflvl
+                         << endl;
+                }
+            }
             else {
                 string val = ndx == -1
                     ? i_reflp->GetString(*i_msg, m_fdp)
                     : i_reflp->GetRepeatedString(*i_msg, m_fdp, ndx);
-                cerr << pathstr(m_path) << ": " << val
-                     << ", R:" << replvl << ", D:" << deflvl
-                     << endl;
+                if (m_dotrace) {
+                    cerr << pathstr(m_path) << ": " << val
+                         << ", R:" << replvl << ", D:" << deflvl
+                         << endl;
+                }
             }
         }
         break;
@@ -300,7 +323,9 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
 
 Schema::Schema(string const & i_protodir,
                string const & i_protofile,
-               string const & i_rootmsg)
+               string const & i_rootmsg,
+               bool i_dotrace)
+    : m_dotrace(i_dotrace)
 {
     m_srctree.MapPath("", i_protodir);
     m_errcollp = new MyErrorCollector();
@@ -318,7 +343,7 @@ Schema::Schema(string const & i_protodir,
     m_proto = m_dmsgfact.GetPrototype(m_typep);
 
     StringSeq path;
-    m_root = traverse_root(path, m_typep);
+    m_root = traverse_root(path, m_typep, m_dotrace);
 }
 
 void
@@ -341,7 +366,9 @@ Schema::convert(string const & infile)
     bool more = true;
     while (more) {
         more = process_record(istrm);
-        cerr << endl;
+        if (m_dotrace) {
+            cerr << endl;
+        }
         if (more)
             ++nrecs;
     }

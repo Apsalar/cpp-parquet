@@ -33,6 +33,7 @@ string g_protofile = DEF_PROTOFILE;
 string g_rootmsg = DEF_ROOTMSG;
 string g_infile = DEF_INFILE;
 bool g_dodump = false;    
+bool g_dotrace = false;    
     
 void
 usage(int & argc, char ** & argv)
@@ -45,6 +46,7 @@ usage(int & argc, char ** & argv)
          << "    -m, --rootmsg=MSG     root message name   [" << DEF_ROOTMSG << "]" << endl
          << "    -i, --infile=FILE     protobuf data input [" << DEF_INFILE << "]" << endl
          << "    -u, --dump            pretty print the schema to stderr" << endl
+         << "    -t, --trace           trace input traversal" << endl
         ;
 }
 
@@ -61,6 +63,7 @@ parse_arguments(int & argc, char ** & argv)
             {"rootmsg",                 required_argument,  0, 'm'},
             {"infile",                  required_argument,  0, 'i'},
             {"dump",                    no_argument,        0, 'u'},
+            {"trace",                   no_argument,        0, 't'},
             {0, 0, 0, 0}
         };
 
@@ -100,6 +103,10 @@ parse_arguments(int & argc, char ** & argv)
             g_dodump = true;
             break;
 
+        case 't':
+            g_dotrace = true;
+            break;
+
         case'?':
             // getopt_long already printed an error message
             usage(argc, argv);
@@ -132,7 +139,7 @@ int run(int & argc, char ** & argv)
 {
     google::InitGoogleLogging(argv[0]);
     parse_arguments(argc, argv);
-    Schema schema(g_protodir, g_protofile, g_rootmsg);
+    Schema schema(g_protodir, g_protofile, g_rootmsg, g_dotrace);
 
     if (g_dodump)
         schema.dump(cerr);

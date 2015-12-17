@@ -31,11 +31,13 @@ public:
     SchemaNode(StringSeq const & i_path,
                google::protobuf::Descriptor const * i_dp,
                google::protobuf::FieldDescriptor const * i_fdp,
-               int i_replvl)
+               int i_replvl,
+               bool i_dotrace)
         : m_path(i_path)
         , m_dp(i_dp)
         , m_fdp(i_fdp)
         , m_replvl(i_replvl)
+        , m_dotrace(i_dotrace)
     {}
 
     std::string const & name() {
@@ -56,12 +58,13 @@ public:
                          int ndx,
                          int replvl, int deflvl);
     
-    StringSeq								m_path;
-    google::protobuf::Descriptor const *	m_dp;
+    StringSeq                               m_path;
+    google::protobuf::Descriptor const *    m_dp;
     google::protobuf::FieldDescriptor const * m_fdp;
-    int										m_replvl;
-    parquet_file::ParquetColumn *			m_parqcolp;
-    SchemaNodeSeq							m_children;
+    int                                     m_replvl;
+    parquet_file::ParquetColumn *           m_parqcolp;
+    SchemaNodeSeq                           m_children;
+    bool                                    m_dotrace;
 };
 
 class NodeTraverser
@@ -75,7 +78,8 @@ class Schema
 public:
     Schema(std::string const & i_protodir,
            std::string const & i_protofile,
-           std::string const & i_rootmsg);
+           std::string const & i_rootmsg,
+           bool i_dotrace);
 
     void dump(std::ostream & ostrm);
 
@@ -86,14 +90,15 @@ private:
 
     bool process_record(std::istream & istrm);
     
-    google::protobuf::compiler::DiskSourceTree	m_srctree;
-    google::protobuf::compiler::MultiFileErrorCollector	* m_errcollp;
-    google::protobuf::compiler::Importer *		m_importerp;
-    google::protobuf::Descriptor const *		m_typep;
-    google::protobuf::DynamicMessageFactory		m_dmsgfact;
-    google::protobuf::Message const *			m_proto;
+    google::protobuf::compiler::DiskSourceTree  m_srctree;
+    google::protobuf::compiler::MultiFileErrorCollector * m_errcollp;
+    google::protobuf::compiler::Importer *      m_importerp;
+    google::protobuf::Descriptor const *        m_typep;
+    google::protobuf::DynamicMessageFactory     m_dmsgfact;
+    google::protobuf::Message const *           m_proto;
 
     SchemaNode * m_root;
+    bool m_dotrace;
 };
 
 } // end protobuf_schema_walker
