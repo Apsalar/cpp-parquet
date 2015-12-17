@@ -30,9 +30,14 @@ output_document(pb_sample::Document const & doc)
     // Type int8 // 1=owner,2=attr_feed
     // Size int32
 
-    int16_t proto = htons(1);
+    // Originaly thought these were network order
+    // int16_t proto = htons(1);
+    // int8_t type = 1;
+    // int32_t size = htonl(ostrm.str().size());
+
+    int16_t proto = 1;
     int8_t type = 1;
-    int32_t size = htonl(ostrm.str().size());
+    int32_t size = ostrm.str().size();
 
     cout.write((char const *) &proto, sizeof(proto));
     cout.write((char const *) &type, sizeof(type));

@@ -281,6 +281,8 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
     case FieldDescriptor::CPPTYPE_FLOAT:
     case FieldDescriptor::CPPTYPE_BOOL:
     case FieldDescriptor::CPPTYPE_ENUM:
+        LOG(FATAL) << "field " << pathstr(m_path)
+                   << " is of unknown type: " << int(m_fdp->cpp_type());
         break;
     case FieldDescriptor::CPPTYPE_STRING:
         {
@@ -318,6 +320,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
     default:
         LOG(FATAL) << "field " << pathstr(m_path)
                    << " is of unknown type: " << int(m_fdp->cpp_type());
+        break;
     }
 }
 
@@ -395,9 +398,10 @@ Schema::process_record(istream & istrm)
 
     if (!istrm.good())
         return false;
-    
-    proto = ntohs(proto);
-    size = ntohl(size);
+
+    // Looks like these fields aren't network order after all.
+    // proto = ntohs(proto);
+    // size = ntohl(size);
 
     string buffer(size_t(size), '\0');
     istrm.read(&buffer[0], size);
