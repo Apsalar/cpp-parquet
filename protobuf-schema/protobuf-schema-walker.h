@@ -16,6 +16,7 @@
 #include <google/protobuf/dynamic_message.h>
 
 #include <parquet-file/parquet-column.h>
+#include <parquet-file/parquet-file.h>
 
 namespace protobuf_schema_walker {
 
@@ -33,17 +34,16 @@ public:
                google::protobuf::FieldDescriptor const * i_fdp,
                int i_maxreplvl,
                int i_maxdeflvl,
-               bool i_dotrace)
-        : m_path(i_path)
-        , m_dp(i_dp)
-        , m_fdp(i_fdp)
-        , m_maxreplvl(i_maxreplvl)
-        , m_maxdeflvl(i_maxdeflvl)
-        , m_dotrace(i_dotrace)
-    {}
+               bool i_dotrace);
+
+    void add_child(SchemaNode * i_child);
 
     std::string const & name() {
         return m_path.back();
+    }
+
+    parquet_file::ParquetColumn * column() {
+        return m_parqcolp;
     }
     
     void traverse(NodeTraverser & nt);
@@ -88,6 +88,8 @@ public:
 
     void convert(std::string const & infile);
 
+    void flush();
+
 private:
     void traverse(NodeTraverser & nt);
 
@@ -99,6 +101,8 @@ private:
     google::protobuf::Descriptor const *        m_typep;
     google::protobuf::DynamicMessageFactory     m_dmsgfact;
     google::protobuf::Message const *           m_proto;
+
+    parquet_file::ParquetFile * m_output;
 
     SchemaNode * m_root;
     bool m_dotrace;

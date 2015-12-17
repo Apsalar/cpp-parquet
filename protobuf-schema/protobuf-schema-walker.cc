@@ -24,6 +24,9 @@ using namespace google::protobuf::compiler;
 
 using namespace protobuf_schema_walker;
 
+using parquet_file::ParquetColumn;
+using parquet_file::ParquetFile;
+
 namespace {
 
 string
@@ -106,14 +109,18 @@ traverse_group(StringSeq & path,
         path.push_back(fd->name());
         switch (fd->cpp_type()) {
         case FieldDescriptor::CPPTYPE_MESSAGE:
-            retval->m_children.push_back(traverse_group(path, fd,
-                                                        maxreplvl, maxdeflvl,
-                                                        i_dotrace));
+            {
+                SchemaNode * child =
+                    traverse_group(path, fd, maxreplvl, maxdeflvl, i_dotrace);
+                retval->add_child(child);
+            }
             break;
         default:
-            retval->m_children.push_back(traverse_leaf(path, fd,
-                                                       maxreplvl, maxdeflvl,
-                                                       i_dotrace));
+            {
+                SchemaNode * child =
+                    traverse_leaf(path, fd, maxreplvl, maxdeflvl, i_dotrace);
+                retval->add_child(child);
+            }
             break;
         }
         path.pop_back();
@@ -132,12 +139,18 @@ traverse_root(StringSeq & path, Descriptor const * dd, bool dotrace)
         path.push_back(fd->name());
         switch (fd->cpp_type()) {
         case FieldDescriptor::CPPTYPE_MESSAGE:
-            retval->m_children.push_back(traverse_group(path, fd,
-                                                        0, 0, dotrace));
+            {
+                SchemaNode * child =
+                    traverse_group(path, fd, 0, 0, dotrace);
+                retval->add_child(child);
+            }
             break;
         default:
-            retval->m_children.push_back(traverse_leaf(path, fd,
-                                                       0, 0, dotrace));
+            {
+                SchemaNode * child =
+                    traverse_leaf(path, fd, 0, 0, dotrace);
+                retval->add_child(child);
+            }
             break;
         }
         path.pop_back();
@@ -163,6 +176,106 @@ class MyErrorCollector : public MultiFileErrorCollector
 } // end namespace
 
 namespace protobuf_schema_walker {
+
+SchemaNode::SchemaNode(StringSeq const & i_path,
+                       Descriptor const * i_dp,
+                       FieldDescriptor const * i_fdp,
+                       int i_maxreplvl,
+                       int i_maxdeflvl,
+                       bool i_dotrace)
+        : m_path(i_path)
+        , m_dp(i_dp)
+        , m_fdp(i_fdp)
+        , m_maxreplvl(i_maxreplvl)
+        , m_maxdeflvl(i_maxdeflvl)
+        , m_dotrace(i_dotrace)
+{
+    // Are we the root node?
+    if (m_fdp == NULL) {
+        parquet::Type::type data_type = parquet::Type::INT32;
+        FieldRepetitionType::type repetition_type =
+            FieldRepetitionType::REQUIRED;
+        Encoding::type encoding = Encoding::PLAIN;
+        CompressionCodec::type compression_codec =
+            CompressionCodec::UNCOMPRESSED;
+
+        m_parqcolp = new ParquetColumn(i_path,
+                                       data_type,
+                                       m_maxreplvl,
+                                       m_maxdeflvl,
+                                       repetition_type,
+                                       encoding,
+                                       compression_codec);
+    }
+    else {
+        parquet::Type::type data_type;
+        switch (m_fdp->cpp_type()) {
+        case FieldDescriptor::CPPTYPE_INT32:
+            data_type = parquet::Type::INT32;
+            break;
+        case FieldDescriptor::CPPTYPE_INT64:
+            data_type = parquet::Type::INT64;
+            break;
+        case FieldDescriptor::CPPTYPE_UINT32:
+            LOG(WARNING) << "converting " << pathstr(i_path)
+                         << " from uint32 to int32";
+            data_type = parquet::Type::INT32;
+            break;
+        case FieldDescriptor::CPPTYPE_UINT64:
+            LOG(WARNING) << "converting " << pathstr(i_path)
+                         << " from uint64 to int64";
+            data_type = parquet::Type::INT64;
+            break;
+        case FieldDescriptor::CPPTYPE_DOUBLE:
+            data_type = parquet::Type::DOUBLE;
+            break;
+        case FieldDescriptor::CPPTYPE_FLOAT:
+            data_type = parquet::Type::FLOAT;
+            break;
+        case FieldDescriptor::CPPTYPE_BOOL:
+            data_type = parquet::Type::BOOLEAN;
+            break;
+        case FieldDescriptor::CPPTYPE_ENUM:
+            LOG(FATAL) << "enum currently unsupported";
+            break;
+        case FieldDescriptor::CPPTYPE_STRING:
+            data_type = parquet::Type::BYTE_ARRAY;
+            break;
+        case FieldDescriptor::CPPTYPE_MESSAGE:
+            // This strikes me as bad; is there an out-of-band value instead?
+            data_type = parquet::Type::INT32;
+            break;
+        default:
+            LOG(FATAL) << "unsupported type: " << int(m_fdp->cpp_type());
+            break;
+        }
+
+        FieldRepetitionType::type repetition_type =
+            m_fdp->is_required() ? FieldRepetitionType::REQUIRED :
+            m_fdp->is_optional() ? FieldRepetitionType::OPTIONAL :
+            FieldRepetitionType::REPEATED;
+
+        Encoding::type encoding = Encoding::PLAIN;
+
+        CompressionCodec::type compression_codec =
+            CompressionCodec::UNCOMPRESSED;
+
+        m_parqcolp = new ParquetColumn(i_path,
+                                       data_type,
+                                       m_maxreplvl,
+                                       m_maxdeflvl,
+                                       repetition_type,
+                                       encoding,
+                                       compression_codec);
+    }
+}
+
+void
+SchemaNode::add_child(SchemaNode * i_child)
+{
+    m_children.push_back(i_child);
+    m_parqcolp->AddChild(i_child->m_parqcolp);
+}
 
 void
 SchemaNode::traverse(NodeTraverser & nt)
@@ -205,7 +318,12 @@ SchemaNode::propagate_field(Reflection const * i_reflp,
             propagate_value(i_reflp, i_msg, -1, replvl, deflvl+1);
         }
         else {
-            propagate_value(NULL, NULL, -1, replvl, deflvl);
+            if (m_dotrace) {
+                cerr << pathstr(m_path) << ": " << "NULL"
+                     << ", R:" << replvl << ", D:" << deflvl
+                     << endl;
+            }
+            m_parqcolp->AddNulls(replvl, deflvl, 1);
         }
     }
     else if (m_fdp->is_repeated()) {
@@ -251,6 +369,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                          << ", R:" << replvl << ", D:" << deflvl
                          << endl;
                 }
+                m_parqcolp->AddNulls(replvl, deflvl, 1);
             }
             else {
                 int32_t val = ndx == -1
@@ -272,6 +391,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                          << ", R:" << replvl << ", D:" << deflvl
                          << endl;
                 }
+                m_parqcolp->AddNulls(replvl, deflvl, 1);
             }
             else {
                 int64_t val = ndx == -1
@@ -293,6 +413,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                          << ", R:" << replvl << ", D:" << deflvl
                          << endl;
                 }
+                m_parqcolp->AddNulls(replvl, deflvl, 1);
             }
             else {
                 uint32_t val = ndx == -1
@@ -314,6 +435,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                          << ", R:" << replvl << ", D:" << deflvl
                          << endl;
                 }
+                m_parqcolp->AddNulls(replvl, deflvl, 1);
             }
             else {
                 uint64_t val = ndx == -1
@@ -335,6 +457,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                          << ", R:" << replvl << ", D:" << deflvl
                          << endl;
                 }
+                m_parqcolp->AddNulls(replvl, deflvl, 1);
             }
             else {
                 double val = ndx == -1
@@ -356,6 +479,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                          << ", R:" << replvl << ", D:" << deflvl
                          << endl;
                 }
+                m_parqcolp->AddNulls(replvl, deflvl, 1);
             }
             else {
                 float val = ndx == -1
@@ -377,6 +501,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                          << ", R:" << replvl << ", D:" << deflvl
                          << endl;
                 }
+                m_parqcolp->AddNulls(replvl, deflvl, 1);
             }
             else {
                 bool val = ndx == -1
@@ -402,6 +527,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                          << ", R:" << replvl << ", D:" << deflvl
                          << endl;
                 }
+                m_parqcolp->AddNulls(replvl, deflvl, 1);
             }
             else {
                 string val = ndx == -1
@@ -455,8 +581,12 @@ Schema::Schema(string const & i_protodir,
 
     m_proto = m_dmsgfact.GetPrototype(m_typep);
 
+    m_output = new ParquetFile("./output.parquet");
+
     StringSeq path;
     m_root = traverse_root(path, m_typep, m_dotrace);
+
+    m_output->SetSchema(m_root->column());
 }
 
 void
@@ -486,6 +616,12 @@ Schema::convert(string const & infile)
             ++nrecs;
     }
     cerr << "processed " << nrecs << " records" << endl;
+}
+
+void
+Schema::flush()
+{
+    m_output->Flush();
 }
 
 void
