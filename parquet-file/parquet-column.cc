@@ -162,8 +162,9 @@ void ParquetColumn::AddRecordMetadata(size_t rep_level_start, size_t rep_level_e
 
 void ParquetColumn::AddRecords(void* buf, uint16_t repetition_level,
                                uint32_t n) {
-  CHECK_LT(repetition_level, max_repetition_level_) <<
-    "For adding repeated data in this column, use AddRepeatedData";
+  // How do we add a required column value w/ this check?
+  // CHECK_LT(repetition_level, max_repetition_level_) <<
+  //    "For adding repeated data in this column, use AddRepeatedData";
   record_metadata.reserve(record_metadata.size() + n);
   // TODO: check for overflow of multiply
   size_t num_bytes = n * bytes_per_datum_;
@@ -211,8 +212,8 @@ void ParquetColumn::AddRepeatedData(void *buf,
 void ParquetColumn::AddNulls(uint16_t current_repetition_level,
                              uint16_t current_definition_level,
                              uint32_t n) {
-  LOG_IF(FATAL, getFieldRepetitionType() != FieldRepetitionType::OPTIONAL) <<
-    "Cannot add NULL to non-optional column: " << FullSchemaPath();
+  LOG_IF(FATAL, getFieldRepetitionType() == FieldRepetitionType::REQUIRED) <<
+    "Cannot add NULL to required column: " << FullSchemaPath();
   record_metadata.reserve(record_metadata.size() + n);
   size_t rep_start = repetition_levels_.size();
   size_t def_start = definition_levels_.size();
