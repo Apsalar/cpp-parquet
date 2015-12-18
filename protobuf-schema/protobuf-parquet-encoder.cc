@@ -144,8 +144,10 @@ int run(int & argc, char ** & argv)
     if (g_dodump)
         schema.dump(cerr);
 
-    if (!g_infile.empty())
+    if (!g_infile.empty()) {
         schema.convert(g_infile);
+        schema.flush();
+    }
     
     return 0;
 }

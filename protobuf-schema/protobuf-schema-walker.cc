@@ -381,6 +381,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                      << ", R:" << replvl << ", D:" << deflvl
                      << endl;
             }
+            m_parqcolp->AddRecords(&val, replvl, 1);
         }
         break;
     case FieldDescriptor::CPPTYPE_INT64:
@@ -393,6 +394,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                      << ", R:" << replvl << ", D:" << deflvl
                      << endl;
             }
+            m_parqcolp->AddRecords(&val, replvl, 1);
         }
         break;
     case FieldDescriptor::CPPTYPE_UINT32:
@@ -405,6 +407,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                      << ", R:" << replvl << ", D:" << deflvl
                      << endl;
             }
+            m_parqcolp->AddRecords(&val, replvl, 1);
         }
         break;
     case FieldDescriptor::CPPTYPE_UINT64:
@@ -417,6 +420,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                      << ", R:" << replvl << ", D:" << deflvl
                      << endl;
             }
+            m_parqcolp->AddRecords(&val, replvl, 1);
         }
         break;
     case FieldDescriptor::CPPTYPE_DOUBLE:
@@ -429,6 +433,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                      << ", R:" << replvl << ", D:" << deflvl
                      << endl;
             }
+            m_parqcolp->AddRecords(&val, replvl, 1);
         }
         break;
     case FieldDescriptor::CPPTYPE_FLOAT:
@@ -441,6 +446,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                      << ", R:" << replvl << ", D:" << deflvl
                      << endl;
             }
+            m_parqcolp->AddRecords(&val, replvl, 1);
         }
         break;
     case FieldDescriptor::CPPTYPE_BOOL:
@@ -453,6 +459,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                      << ", R:" << replvl << ", D:" << deflvl
                      << endl;
             }
+            m_parqcolp->AddRecords(&val, replvl, 1);
         }
         break;
     case FieldDescriptor::CPPTYPE_ENUM:
@@ -469,6 +476,8 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                      << ", R:" << replvl << ", D:" << deflvl
                      << endl;
             }
+            void * ptr = (void *) val.data();
+            m_parqcolp->AddVariableLengthByteArray(ptr, replvl, val.size());
         }
         break;
     case FieldDescriptor::CPPTYPE_MESSAGE:
@@ -507,7 +516,9 @@ Schema::Schema(string const & i_protodir,
 
     m_proto = m_dmsgfact.GetPrototype(m_typep);
 
-    m_output = new ParquetFile("./output.parquet");
+    string outfile = "./output.parquet";
+    unlink(outfile.c_str());
+    m_output = new ParquetFile(outfile);
 
     StringSeq path;
     m_root = traverse_root(path, m_typep, m_dotrace);
