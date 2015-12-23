@@ -18,6 +18,10 @@ cppparquet
 parquet-file-test
 pb_sample
 
+parquet_file_test
+
+*.parquet
+
 *-golden
 
 *.dSYM
