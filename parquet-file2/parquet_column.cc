@@ -7,6 +7,9 @@
 
 #include "parquet_types.h"
 
+#include "parquet-file/util/bit-util.h"
+#include "parquet-file/util/rle-encoding.h"
+
 #include "parquet_column.h"
 
 using namespace std;
@@ -31,6 +34,7 @@ ParquetColumn::ParquetColumn(StringSeq const & i_name,
     , m_encoding(i_encoding)
     , m_compression_codec(i_compression_codec)
     , m_numrecs(0)
+    , m_column_write_offset(-1L)
 {
 }
 
@@ -80,15 +84,15 @@ ParquetColumn::path_string() const
 void
 ParquetColumn::flush(int fd, TCompactProtocol * protocol)
 {
-    m_write_offset = lseek(fd, 0, SEEK_CUR);
+    m_column_write_offset = lseek(fd, 0, SEEK_CUR);
 
     VLOG(2) << "Inside flush for " << path_string();
     VLOG(2) << "\tData size: " << m_data.size() << " bytes.";
     VLOG(2) << "\tNumber of records for this flush: " <<  num_records();
-    VLOG(2) << "\tFile offset: " << m_write_offset;
+    VLOG(2) << "\tFile offset: " << m_column_write_offset;
 
-    OctetBuffer enc_rep_lvls = encode_repetition_levels();
-    OctetBuffer enc_def_lvls = encode_definition_levels();
+    OctetSeq enc_rep_lvls = encode_repetition_levels();
+    OctetSeq enc_def_lvls = encode_definition_levels();
     
     m_uncompressed_size =
         m_data.size() + enc_rep_lvls.size() + enc_def_lvls.size();
@@ -123,10 +127,10 @@ ParquetColumn::flush(int fd, TCompactProtocol * protocol)
     VLOG(2) << "\tTotal uncompressed bytes: " << m_uncompressed_size;
 
     if (!enc_rep_lvls.empty())
-        flush_buffer(fd, enc_rep_lvls);
+        flush_seq(fd, enc_rep_lvls);
 
     if (!enc_def_lvls.empty())
-        flush_buffer(fd, enc_def_lvls);
+        flush_seq(fd, enc_def_lvls);
 
     VLOG(2) << "\tData size: " << m_data.size();
 
@@ -138,29 +142,98 @@ ParquetColumn::flush(int fd, TCompactProtocol * protocol)
 ColumnMetaData
 ParquetColumn::metadata() const
 {
-    LOG(FATAL) << "not implemented yet";
+    ColumnMetaData column_metadata;
+    column_metadata.__set_type(m_data_type);
+    column_metadata.__set_encodings({m_encoding});
+    column_metadata.__set_codec(m_compression_codec);
+    column_metadata.__set_num_values(num_datum());
+    column_metadata.__set_total_uncompressed_size(m_uncompressed_size);
+    column_metadata.__set_total_compressed_size(m_uncompressed_size);
+    column_metadata.__set_data_page_offset(m_column_write_offset);
+    column_metadata.__set_path_in_schema(m_name);
+    return column_metadata;
 }
 
-OctetBuffer
+OctetSeq
 ParquetColumn::encode_repetition_levels()
 {
-    OctetBuffer retval;
-    LOG(FATAL) << "not implemented yet";
+    OctetSeq retval;
+
+    if (m_repetition_type == FieldRepetitionType::REPEATED) {
+        int bitwidth = impala::BitUtil::Log2(m_maxreplvl + 1);
+        size_t maxbufsz =
+            impala::RleEncoder::MaxBufferSize(bitwidth, m_meta.size());
+        retval.resize(maxbufsz);
+        impala::RleEncoder encoder(retval.data(), maxbufsz, m_maxreplvl);
+        for (auto md : m_meta)
+            encoder.Put(md.m_replvl);
+        encoder.Flush();
+        retval.resize(encoder.len());
+    }
+
     return move(retval);
 }
 
-OctetBuffer
+OctetSeq
 ParquetColumn::encode_definition_levels()
 {
-    OctetBuffer retval;
-    LOG(FATAL) << "not implemented yet";
+    OctetSeq retval;
+
+    if (m_repetition_type != FieldRepetitionType::REQUIRED) {
+        int bitwidth = impala::BitUtil::Log2(m_maxdeflvl + 1);
+        size_t maxbufsz =
+            impala::RleEncoder::MaxBufferSize(bitwidth, m_meta.size());
+        retval.resize(maxbufsz);
+        impala::RleEncoder encoder(retval.data(), maxbufsz, m_maxdeflvl);
+        for (auto md : m_meta)
+            encoder.Put(md.m_deflvl);
+        encoder.Flush();
+        retval.resize(encoder.len());
+    }
+
     return move(retval);
 }
 
 void
 ParquetColumn::flush_buffer(int fd, OctetBuffer const & i_buffer)
 {
-    LOG(FATAL) << "not implemented yet";
+    size_t blksz = 8192;
+    OctetSeq blk;
+    blk.reserve(blksz);
+    size_t remain = i_buffer.size();
+    size_t sz = min(blksz, remain);
+    for (auto it = i_buffer.begin(); it != i_buffer.end();)
+    {
+        // Iterator at begining of next block.
+        auto nit = next(it, sz);
+
+        // Copy all bytes between iterators.
+        blk.assign(it, nit);
+
+        // Write them.
+        flush_seq(fd, blk);
+
+        // How many bytes left?
+        remain -= sz;
+
+        // How big is the next block?
+        sz = min(blksz, remain);
+
+        it = nit;
+    }
+}
+
+void
+ParquetColumn::flush_seq(int fd, OctetSeq const & i_seq)
+{
+    ssize_t rv = write(fd, i_seq.data(), i_seq.size());
+    if (rv < 0) {
+        LOG(FATAL) << "flush_seq: write failed: " << strerror(errno);
+    }
+    else if (rv != i_seq.size()) {
+        LOG(FATAL) << "flush_seq: unexpected write size:"
+                   << " expecting " << i_seq.size() << ", saw " << rv;
+    }
 }
 
 } // end namespace parquet_file2

@@ -21,6 +21,7 @@
 namespace parquet_file2 {
 
 typedef std::vector<std::string> StringSeq;
+typedef std::vector<uint8_t> OctetSeq;
 typedef std::deque<uint8_t> OctetBuffer;
 
 class ParquetColumn
@@ -34,10 +35,8 @@ public:
                   parquet::Encoding::type i_encoding,
                   parquet::CompressionCodec::type i_compression_codec);
 
-    void add_datum(void const * i_ptr,
-                   size_t i_size,
-                   int i_replvl,
-                   int i_deflvl);
+    void add_datum(void const * i_ptr, size_t i_size,
+                   int i_replvl, int i_deflvl);
 
     size_t num_records() const;
 
@@ -65,11 +64,13 @@ private:
     };
     typedef std::deque<MetaData> MetaDataSeq;
     
-    OctetBuffer encode_repetition_levels();
+    OctetSeq encode_repetition_levels();
 
-    OctetBuffer encode_definition_levels();
+    OctetSeq encode_definition_levels();
 
     void flush_buffer(int fd, OctetBuffer const & i_buffer);
+
+    void flush_seq(int fd, OctetSeq const & i_seq);
 
     StringSeq m_name;
     int m_maxreplvl;
@@ -83,7 +84,7 @@ private:
     MetaDataSeq m_meta;
 
     size_t m_numrecs;
-    off_t m_write_offset;
+    off_t m_column_write_offset;
     size_t m_uncompressed_size;
 };
 
