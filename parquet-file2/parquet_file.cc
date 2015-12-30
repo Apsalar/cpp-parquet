@@ -29,14 +29,15 @@ ParquetFile::ParquetFile(string const & i_path)
         << "trouble creating file " << i_path.c_str()
         << ": " << strerror(errno);
 
-    write(m_fd, PARQUET_MAGIC, sizeof(PARQUET_MAGIC));
+    write(m_fd, PARQUET_MAGIC, strlen(PARQUET_MAGIC));
 
     m_file_transport.reset(new TFDTransport(m_fd));
     m_protocol.reset(new TCompactProtocol(m_file_transport));
 
-  // Parquet-specific metadata for the file.
+    // Parquet-specific metadata for the file.
     m_file_meta_data.__set_version(1);
-    m_file_meta_data.__set_created_by("Apsalar");
+    // m_file_meta_data.__set_created_by("Apsalar");
+    m_file_meta_data.__set_created_by("Neal sid");
 }
 
 void

@@ -62,21 +62,34 @@ class ParquetFileTest : public ::testing::Test {
 // Test that we can add a column and some data.
 TEST_F(ParquetFileTest, AddColumn) {
     ParquetFile pqfile(m_output_filename);
-    ParquetColumnHandle pqh
-        (new ParquetColumn({"root"},
+
+    ParquetColumnHandle pqh1
+        (new ParquetColumn({"root", "AllInts"},
                            1, 1,
                            Type::INT32,
                            FieldRepetitionType::REQUIRED,
                            Encoding::PLAIN,
                            CompressionCodec::UNCOMPRESSED));
-    pqfile.add_column(pqh);
 
-    int nrecs = 128;
+    ParquetColumnHandle pqh2
+        (new ParquetColumn({"root", "AllInts1"},
+                           1, 1,
+                           Type::INT32,
+                           FieldRepetitionType::REQUIRED,
+                           Encoding::PLAIN,
+                           CompressionCodec::UNCOMPRESSED));
+
+    pqfile.add_column(pqh1);
+    pqfile.add_column(pqh2);
+
+    int nrecs = 100;
     
-    for (int32_t ii = 0; ii < nrecs; ++ii)
-        pqh->add_datum(&ii, sizeof(ii), 0, 0);
+    for (int32_t ii = 0; ii < nrecs; ++ii) {
+        pqh1->add_datum(&ii, sizeof(ii), 0, 0);
+        pqh2->add_datum(&ii, sizeof(ii), 0, 0);
+    }
 
-    CHECK_EQ(pqh->num_records(), nrecs) << "num_records incorrect";
+    CHECK_EQ(pqh1->num_records(), nrecs) << "num_records incorrect";
 
     pqfile.flush();
 }
