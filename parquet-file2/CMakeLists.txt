@@ -1,7 +1,7 @@
 #
 # Build CMakeFile for cpp-parquet
 
-ADD_LIBRARY(libparquetfile parquet_file.cc parquet_column.cc)
+ADD_LIBRARY(libparquetfile2 parquet_file.cc parquet_column.cc)
 
 ADD_CUSTOM_COMMAND(
    OUTPUT ${SOURCE_DIR}/src/gtest-all.cc
@@ -28,4 +28,4 @@ IF(SYSTEM_HAS_TR1_TUPLE)
 	"-DGTEST_USE_OWN_TR1_TUPLE=0")
 ENDIF(SYSTEM_HAS_TR1_TUPLE)
 
-TARGET_LINK_LIBRARIES(parquet_file_test libparquetfile pthread glog thrift parquet-thrift)
+TARGET_LINK_LIBRARIES(parquet_file_test libparquetfile2 pthread glog thrift parquet-thrift)
