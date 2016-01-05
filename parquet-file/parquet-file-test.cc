@@ -1,6 +1,6 @@
 // Copyright 2014 Mount Sinai School of Medicine
 
-#include <signal.h>
+#include <signal.h>		// gtest/gtest.h needs siginfo_t
 
 #include <parquet-file/parquet-file.h>
 
