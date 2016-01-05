@@ -20,16 +20,16 @@ using apache::thrift::protocol::TCompactProtocol;
 namespace parquet_file2 {
 
 ParquetColumn::ParquetColumn(StringSeq const & i_name,
+                             Type::type i_data_type,
                              int i_maxreplvl,
                              int i_maxdeflvl,
-                             Type::type i_data_type,
                              FieldRepetitionType::type i_repetition_type,
                              Encoding::type i_encoding,
                              CompressionCodec::type i_compression_codec)
     : m_name(i_name)
+    , m_data_type(i_data_type)
     , m_maxreplvl(i_maxreplvl)
     , m_maxdeflvl(i_maxdeflvl)
-    , m_data_type(i_data_type)
     , m_repetition_type(i_repetition_type)
     , m_encoding(i_encoding)
     , m_compression_codec(i_compression_codec)

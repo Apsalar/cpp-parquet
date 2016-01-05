@@ -28,9 +28,9 @@ class ParquetColumn
 {
 public:
     ParquetColumn(StringSeq const & i_name,
+                  parquet::Type::type i_data_type,
                   int i_maxreplvl,
                   int i_maxdeflvl,
-                  parquet::Type::type i_data_type,
                   parquet::FieldRepetitionType::type i_repetition_type,
                   parquet::Encoding::type i_encoding,
                   parquet::CompressionCodec::type i_compression_codec);

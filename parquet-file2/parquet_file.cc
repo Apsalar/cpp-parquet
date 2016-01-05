@@ -1,7 +1,7 @@
 //
 // Parquet File Writer
 //
-// Copyright (c) 2015 Apsalar Inc.
+// Copyright (c) 2015, 2016 Apsalar Inc.
 // All rights reserved.
 //
 
@@ -24,7 +24,7 @@ ParquetFile::ParquetFile(string const & i_path)
     : m_path(i_path)
 {
     m_fd = open(i_path.c_str(), O_RDWR | O_CREAT | O_EXCL, 0700);
-
+    
     LOG_IF(FATAL, m_fd == -1)
         << "trouble creating file " << i_path.c_str()
         << ": " << strerror(errno);
@@ -74,7 +74,12 @@ ParquetFile::flush()
         VLOG(2) << "Wrote " << to_string(column_metadata.total_uncompressed_size)
                 << " bytes for column: " << column->path_string();
         ColumnChunk column_chunk;
+#if defined(FIXME)
         column_chunk.__set_file_path(m_path.c_str());
+#else
+        // Neal didn't initialize his file path ...
+        column_chunk.__set_file_path("");
+#endif
         column_chunk.__set_file_offset(column_metadata.data_page_offset);
         column_chunk.__set_meta_data(column_metadata);
         column_chunks.push_back(column_chunk);

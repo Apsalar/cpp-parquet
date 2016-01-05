@@ -65,16 +65,16 @@ TEST_F(ParquetFileTest, AddColumn) {
 
     ParquetColumnHandle pqh1
         (new ParquetColumn({"root", "AllInts"},
-                           1, 1,
                            Type::INT32,
+                           1, 1,
                            FieldRepetitionType::REQUIRED,
                            Encoding::PLAIN,
                            CompressionCodec::UNCOMPRESSED));
 
     ParquetColumnHandle pqh2
         (new ParquetColumn({"root", "AllInts1"},
-                           1, 1,
                            Type::INT32,
+                           1, 1,
                            FieldRepetitionType::REQUIRED,
                            Encoding::PLAIN,
                            CompressionCodec::UNCOMPRESSED));
