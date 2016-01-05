@@ -1,7 +1,7 @@
 //
 // Parquet Column Writer
 //
-// Copyright (c) 2015 Apsalar Inc.
+// Copyright (c) 2015, 2016 Apsalar Inc.
 // All rights reserved.
 //
 
@@ -19,14 +19,14 @@ using apache::thrift::protocol::TCompactProtocol;
 
 namespace parquet_file2 {
 
-ParquetColumn::ParquetColumn(StringSeq const & i_name,
+ParquetColumn::ParquetColumn(StringSeq const & i_path,
                              Type::type i_data_type,
                              int i_maxreplvl,
                              int i_maxdeflvl,
                              FieldRepetitionType::type i_repetition_type,
                              Encoding::type i_encoding,
                              CompressionCodec::type i_compression_codec)
-    : m_name(i_name)
+    : m_path(i_path)
     , m_data_type(i_data_type)
     , m_maxreplvl(i_maxreplvl)
     , m_maxdeflvl(i_maxdeflvl)
@@ -36,6 +36,12 @@ ParquetColumn::ParquetColumn(StringSeq const & i_name,
     , m_numrecs(0)
     , m_column_write_offset(-1L)
 {
+}
+
+void
+ParquetColumn::add_child(ParquetColumnHandle const & ch)
+{
+    m_children.push_back(ch);
 }
 
 void
@@ -57,6 +63,51 @@ ParquetColumn::add_datum(void const * i_ptr,
         ++m_numrecs;
 }
 
+string
+ParquetColumn::name() const
+{
+    return m_path.back();
+}
+
+Type::type
+ParquetColumn::data_type() const
+{
+    return m_data_type;
+}
+
+FieldRepetitionType::type
+ParquetColumn::repetition_type() const
+{
+    return m_repetition_type;
+}
+
+string
+ParquetColumn::path_string() const
+{
+    ostringstream ostrm;
+    bool firsttime = true;
+    for (string elem : m_path) {
+        if (firsttime)
+            firsttime = false;
+        else
+            ostrm << '.';
+        ostrm << elem;
+    }
+    return move(ostrm.str());
+}
+
+ParquetColumnSeq const &
+ParquetColumn::children() const
+{
+    return m_children;
+}
+
+bool
+ParquetColumn::is_leaf() const
+{
+    return m_children.empty();
+}
+
 size_t
 ParquetColumn::num_records() const
 {
@@ -75,10 +126,13 @@ ParquetColumn::data_size() const
     return m_data.size();
 }
 
-string
-ParquetColumn::path_string() const
+void
+ParquetColumn::traverse(Traverser & tt)
 {
-    LOG(FATAL) << "not implemented yet";
+    for (auto child : m_children) {
+        tt(child);
+        child->traverse(tt);
+    }
 }
 
 void
@@ -142,6 +196,10 @@ ParquetColumn::flush(int fd, TCompactProtocol * protocol)
 ColumnMetaData
 ParquetColumn::metadata() const
 {
+    // Really not sure this is correct; it is what cpp-parquet does ...
+    StringSeq tail;
+    tail.push_back(m_path.back());
+
     ColumnMetaData column_metadata;
     column_metadata.__set_type(m_data_type);
     column_metadata.__set_encodings({m_encoding});
@@ -150,7 +208,7 @@ ParquetColumn::metadata() const
     column_metadata.__set_total_uncompressed_size(m_uncompressed_size);
     column_metadata.__set_total_compressed_size(m_uncompressed_size);
     column_metadata.__set_data_page_offset(m_column_write_offset);
-    column_metadata.__set_path_in_schema(m_name);
+    column_metadata.__set_path_in_schema(tail);
     return column_metadata;
 }
 

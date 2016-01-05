@@ -40,20 +40,61 @@ ParquetFile::ParquetFile(string const & i_path)
     m_file_meta_data.__set_created_by("Neal sid");
 }
 
-void
-ParquetFile::add_column(ParquetColumnHandle const & col)
+class SchemaBuilder : public ParquetColumn::Traverser
 {
-    m_cols.push_back(col);
+public:
+    virtual void operator()(ParquetColumnHandle const & ch)
+    {
+        SchemaElement elem;
+        elem.__set_name(ch->name());
+        elem.__set_repetition_type(ch->repetition_type());
+        // Parquet requires that we don't set the number of children if
+        // the schema element is for a data column.
+        if (ch->children().size() > 0) {
+            elem.__set_num_children(ch->children().size());
+        } else {
+            elem.__set_type(ch->data_type());
+        }
+        m_schema.push_back(elem);
+    }
+    vector<SchemaElement> m_schema;
+};
+
+void
+ParquetFile::set_root(ParquetColumnHandle const & col)
+{
+    m_root = col;
+
+    SchemaBuilder sb;
+    sb(m_root);
+    m_root->traverse(sb);
+    m_file_meta_data.__set_schema(sb.m_schema);
 }
+
+class ColumnListing : public ParquetColumn::Traverser
+{
+public:
+    virtual void operator()(ParquetColumnHandle const & ch) {
+        m_cols.push_back(ch);
+    }
+    ParquetColumnSeq m_cols;
+};
 
 void
 ParquetFile::flush()
 {
+    ColumnListing cl;
+    cl(m_root);
+    m_root->traverse(cl);
+
     // Make sure we have the same number of records in all
     // columns.
     set<size_t> colnrecs;
-    for (auto it = m_cols.begin(); it != m_cols.end(); ++it)
-        colnrecs.insert((*it)->num_records());
+    for (auto it = cl.m_cols.begin(); it != cl.m_cols.end(); ++it) {
+        ParquetColumnHandle const & ch = *it;
+        if (ch->is_leaf())
+            colnrecs.insert((*it)->num_records());
+    }
     LOG_IF(FATAL, colnrecs.size() > 1)
         << "all columns must have the same number of record; "
         << "saw " << colnrecs.size() << " different sizes";
@@ -64,15 +105,20 @@ ParquetFile::flush()
     RowGroup row_group;
     row_group.__set_num_rows(numrecs);
     vector<ColumnChunk> column_chunks;
-    for (auto it = m_cols.begin(); it != m_cols.end(); ++it) {
-        auto column = *it;
-        VLOG(2) << "Writing column: " << column->path_string();
-        column->flush(m_fd, m_protocol.get());
-        ColumnMetaData column_metadata = column->metadata();
+    for (auto it = cl.m_cols.begin(); it != cl.m_cols.end(); ++it) {
+        ParquetColumnHandle const & ch = *it;
+
+        // We only write out leaf nodes.
+        if (!ch->is_leaf())
+            continue;
+
+        VLOG(2) << "Writing column: " << ch->path_string();
+        ch->flush(m_fd, m_protocol.get());
+        ColumnMetaData column_metadata = ch->metadata();
         row_group.__set_total_byte_size(row_group.total_byte_size +
                                         column_metadata.total_uncompressed_size);
         VLOG(2) << "Wrote " << to_string(column_metadata.total_uncompressed_size)
-                << " bytes for column: " << column->path_string();
+                << " bytes for column: " << ch->path_string();
         ColumnChunk column_chunk;
 #if defined(FIXME)
         column_chunk.__set_file_path(m_path.c_str());

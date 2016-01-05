@@ -21,32 +21,30 @@ int main(int argc, char* argv[]) {
   ParquetFile output(argv[1]);
   int NN = stoi(argv[2], NULL, 0);
 
-  ParquetColumnHandle ch1
-      (new ParquetColumn({"AllInts"}, parquet::Type::INT32,
+  ParquetColumnHandle ch0
+      (new ParquetColumn({"root"}, parquet::Type::INT32,
                          1, 1,
                          FieldRepetitionType::REQUIRED,
                          Encoding::PLAIN,
                          CompressionCodec::UNCOMPRESSED));
-  output.add_column(ch1);
+
+  ParquetColumnHandle ch1
+      (new ParquetColumn({"root", "AllInts"}, parquet::Type::INT32,
+                         1, 1,
+                         FieldRepetitionType::REQUIRED,
+                         Encoding::PLAIN,
+                         CompressionCodec::UNCOMPRESSED));
+  ch0->add_child(ch1);
 
   ParquetColumnHandle ch2
-      (new ParquetColumn({"AllInts1"}, parquet::Type::INT32,
+      (new ParquetColumn({"root", "AllInts1"}, parquet::Type::INT32,
                          1, 1,
                          FieldRepetitionType::REQUIRED,
                          Encoding::PLAIN,
                          CompressionCodec::UNCOMPRESSED));
-  output.add_column(ch2);
+  ch0->add_child(ch2);
 
-#if 0
-  ParquetColumn* root_column =
-    new ParquetColumn({"root"}, parquet::Type::INT32,
-          1, 1,
-          FieldRepetitionType::REQUIRED,
-          Encoding::PLAIN,
-          CompressionCodec::UNCOMPRESSED);
-  root_column->SetChildren({one_column, two_column});
-  output.SetSchema(root_column);
-#endif
+  output.set_root(ch0);
 
   for (int32_t ii = 0; ii < NN; ++ii) {
       ch1->add_datum(&ii, sizeof(ii), 0, 0);

@@ -1,7 +1,7 @@
 //
 // Parquet Column Writer
 //
-// Copyright (c) 2015 Apsalar Inc.
+// Copyright (c) 2015, 2016 Apsalar Inc.
 // All rights reserved.
 //
 
@@ -24,10 +24,15 @@ typedef std::vector<std::string> StringSeq;
 typedef std::vector<uint8_t> OctetSeq;
 typedef std::deque<uint8_t> OctetBuffer;
 
+
+class ParquetColumn;
+typedef std::shared_ptr<ParquetColumn> ParquetColumnHandle;
+typedef std::vector<ParquetColumnHandle> ParquetColumnSeq;
+
 class ParquetColumn
 {
 public:
-    ParquetColumn(StringSeq const & i_name,
+    ParquetColumn(StringSeq const & i_path,
                   parquet::Type::type i_data_type,
                   int i_maxreplvl,
                   int i_maxdeflvl,
@@ -35,16 +40,36 @@ public:
                   parquet::Encoding::type i_encoding,
                   parquet::CompressionCodec::type i_compression_codec);
 
+    void add_child(ParquetColumnHandle const & ch);
+
     void add_datum(void const * i_ptr, size_t i_size,
                    int i_replvl, int i_deflvl);
 
+    std::string name() const;
+
+    parquet::Type::type data_type() const;
+
+    parquet::FieldRepetitionType::type repetition_type() const;
+    
+    std::string path_string() const;
+
+    ParquetColumnSeq const & children() const;
+
+    bool is_leaf() const;
+    
     size_t num_records() const;
 
     size_t num_datum() const;
 
     size_t data_size() const;
 
-    std::string path_string() const;
+    class Traverser
+    {
+    public:
+        virtual void operator()(ParquetColumnHandle const & ch) = 0;
+    };
+
+    void traverse(Traverser & tt);
 
     void flush(int fd, apache::thrift::protocol::TCompactProtocol* protocol);
     
@@ -72,7 +97,7 @@ private:
 
     void flush_seq(int fd, OctetSeq const & i_seq);
 
-    StringSeq m_name;
+    StringSeq m_path;
     int m_maxreplvl;
     int m_maxdeflvl;
     parquet::Type::type m_data_type;
@@ -80,6 +105,8 @@ private:
     parquet::Encoding::type m_encoding;
     parquet::CompressionCodec::type m_compression_codec;
 
+    ParquetColumnSeq m_children;
+    
     OctetBuffer m_data;
     MetaDataSeq m_meta;
 

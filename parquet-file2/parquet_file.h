@@ -1,7 +1,7 @@
 //
 // Parquet File Writer
 //
-// Copyright (c) 2015 Apsalar Inc.
+// Copyright (c) 2015, 2016 Apsalar Inc.
 // All rights reserved.
 //
 
@@ -25,16 +25,13 @@ using parquet::FileMetaData;
 
 namespace parquet_file2 {
 
-typedef std::shared_ptr<ParquetColumn> ParquetColumnHandle;
-typedef std::vector<ParquetColumnHandle> ParquetColumnSeq;
-
 class ParquetFile
 {
 public:
     ParquetFile(std::string const & i_path);
 
-    void add_column(ParquetColumnHandle const & col);
-
+    void set_root(ParquetColumnHandle const & rh);
+    
     void flush();
 
 private:
@@ -43,7 +40,7 @@ private:
     FileMetaData m_file_meta_data;
     boost::shared_ptr<TFDTransport> m_file_transport;
     boost::shared_ptr<TCompactProtocol> m_protocol;
-    ParquetColumnSeq m_cols;
+    ParquetColumnHandle m_root;
 };
 
 } // end namespace parquet_file2

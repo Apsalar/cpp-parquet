@@ -1,7 +1,7 @@
 //
 // Parquet File Test
 //
-// Copyright (c) 2015 Apsalar Inc.
+// Copyright (c) 2015, 2016 Apsalar Inc.
 // All rights reserved.
 //
 
@@ -63,6 +63,14 @@ class ParquetFileTest : public ::testing::Test {
 TEST_F(ParquetFileTest, AddColumn) {
     ParquetFile pqfile(m_output_filename);
 
+    ParquetColumnHandle pqh0
+        (new ParquetColumn({"root"},
+                           Type::INT32,	// ignored
+                           1, 1,
+                           FieldRepetitionType::REQUIRED,
+                           Encoding::PLAIN,
+                           CompressionCodec::UNCOMPRESSED));
+
     ParquetColumnHandle pqh1
         (new ParquetColumn({"root", "AllInts"},
                            Type::INT32,
@@ -70,6 +78,7 @@ TEST_F(ParquetFileTest, AddColumn) {
                            FieldRepetitionType::REQUIRED,
                            Encoding::PLAIN,
                            CompressionCodec::UNCOMPRESSED));
+    pqh0->add_child(pqh1);
 
     ParquetColumnHandle pqh2
         (new ParquetColumn({"root", "AllInts1"},
@@ -78,9 +87,9 @@ TEST_F(ParquetFileTest, AddColumn) {
                            FieldRepetitionType::REQUIRED,
                            Encoding::PLAIN,
                            CompressionCodec::UNCOMPRESSED));
+    pqh0->add_child(pqh2);
 
-    pqfile.add_column(pqh1);
-    pqfile.add_column(pqh2);
+    pqfile.set_root(pqh0);
 
     int nrecs = 100;
     
