@@ -14,6 +14,8 @@
 
 #include <glog/logging.h>
 
+#include "parquet_types.h"
+
 #include <google/protobuf/compiler/importer.h>
 
 #include "protobuf-schema-walker.h"
@@ -23,9 +25,8 @@ using namespace google::protobuf;
 using namespace google::protobuf::compiler;
 
 using namespace protobuf_schema_walker;
-
-using parquet_file::ParquetColumn;
-using parquet_file::ParquetFile;
+using namespace parquet;
+using namespace parquet_file2;
 
 namespace {
 
@@ -199,7 +200,8 @@ SchemaNode::SchemaNode(StringSeq const & i_path,
         CompressionCodec::type compression_codec =
             CompressionCodec::UNCOMPRESSED;
 
-        m_parqcolp = new ParquetColumn(i_path,
+        m_pqcol =
+            make_shared<ParquetColumn>(i_path,
                                        data_type,
                                        m_maxreplvl,
                                        m_maxdeflvl,
@@ -260,7 +262,8 @@ SchemaNode::SchemaNode(StringSeq const & i_path,
         CompressionCodec::type compression_codec =
             CompressionCodec::UNCOMPRESSED;
 
-        m_parqcolp = new ParquetColumn(i_path,
+        m_pqcol =
+            make_shared<ParquetColumn>(i_path,
                                        data_type,
                                        m_maxreplvl,
                                        m_maxdeflvl,
@@ -274,7 +277,7 @@ void
 SchemaNode::add_child(SchemaNode * i_child)
 {
     m_children.push_back(i_child);
-    m_parqcolp->AddChild(i_child->m_parqcolp);
+    m_pqcol->add_child(i_child->m_pqcol);
 }
 
 void
@@ -327,7 +330,7 @@ SchemaNode::propagate_field(Reflection const * i_reflp,
                          << ", R:" << replvl << ", D:" << deflvl
                          << endl;
                 }
-                m_parqcolp->AddNulls(replvl, deflvl, 1);
+                m_pqcol->add_datum(NULL, 0, replvl, deflvl);
             }
         }
     }
@@ -339,7 +342,7 @@ SchemaNode::propagate_field(Reflection const * i_reflp,
                      << ", R:" << replvl << ", D:" << deflvl
                      << endl;
             }
-            m_parqcolp->AddNulls(replvl, deflvl, 1);
+            m_pqcol->add_datum(NULL, 0, replvl, deflvl);
         }
         else {
             for (size_t ndx = 0; ndx < nvals; ++ndx) {
@@ -381,7 +384,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                      << ", R:" << replvl << ", D:" << deflvl
                      << endl;
             }
-            m_parqcolp->AddRecords(&val, replvl, 1);
+            m_pqcol->add_datum(&val, sizeof(val), replvl, deflvl);
         }
         break;
     case FieldDescriptor::CPPTYPE_INT64:
@@ -394,7 +397,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                      << ", R:" << replvl << ", D:" << deflvl
                      << endl;
             }
-            m_parqcolp->AddRecords(&val, replvl, 1);
+            m_pqcol->add_datum(&val, sizeof(val), replvl, deflvl);
         }
         break;
     case FieldDescriptor::CPPTYPE_UINT32:
@@ -407,7 +410,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                      << ", R:" << replvl << ", D:" << deflvl
                      << endl;
             }
-            m_parqcolp->AddRecords(&val, replvl, 1);
+            m_pqcol->add_datum(&val, sizeof(val), replvl, deflvl);
         }
         break;
     case FieldDescriptor::CPPTYPE_UINT64:
@@ -420,7 +423,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                      << ", R:" << replvl << ", D:" << deflvl
                      << endl;
             }
-            m_parqcolp->AddRecords(&val, replvl, 1);
+            m_pqcol->add_datum(&val, sizeof(val), replvl, deflvl);
         }
         break;
     case FieldDescriptor::CPPTYPE_DOUBLE:
@@ -433,7 +436,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                      << ", R:" << replvl << ", D:" << deflvl
                      << endl;
             }
-            m_parqcolp->AddRecords(&val, replvl, 1);
+            m_pqcol->add_datum(&val, sizeof(val), replvl, deflvl);
         }
         break;
     case FieldDescriptor::CPPTYPE_FLOAT:
@@ -446,7 +449,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                      << ", R:" << replvl << ", D:" << deflvl
                      << endl;
             }
-            m_parqcolp->AddRecords(&val, replvl, 1);
+            m_pqcol->add_datum(&val, sizeof(val), replvl, deflvl);
         }
         break;
     case FieldDescriptor::CPPTYPE_BOOL:
@@ -459,7 +462,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                      << ", R:" << replvl << ", D:" << deflvl
                      << endl;
             }
-            m_parqcolp->AddRecords(&val, replvl, 1);
+            m_pqcol->add_datum(&val, sizeof(val), replvl, deflvl);
         }
         break;
     case FieldDescriptor::CPPTYPE_ENUM:
@@ -476,8 +479,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                      << ", R:" << replvl << ", D:" << deflvl
                      << endl;
             }
-            void * ptr = (void *) val.data();
-            m_parqcolp->AddVariableLengthByteArray(ptr, replvl, val.size());
+            m_pqcol->add_datum(val.data(), val.size(), replvl, deflvl);
         }
         break;
     case FieldDescriptor::CPPTYPE_MESSAGE:
@@ -520,10 +522,10 @@ Schema::Schema(string const & i_protodir,
     unlink(outfile.c_str());
     m_output = new ParquetFile(outfile);
 
-    StringSeq path;
+    StringSeq path = { i_rootmsg };
     m_root = traverse_root(path, m_typep, m_dotrace);
 
-    m_output->SetSchema(m_root->column());
+    m_output->set_root(m_root->column());
 }
 
 void
@@ -558,7 +560,7 @@ Schema::convert(string const & infile)
 void
 Schema::flush()
 {
-    m_output->Flush();
+    m_output->flush();
 }
 
 void

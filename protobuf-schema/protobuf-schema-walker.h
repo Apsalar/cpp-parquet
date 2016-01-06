@@ -1,7 +1,7 @@
 //
 // Schema related functions
 //
-// Copyright (c) 2015 Apsalar Inc. All rights reserved.
+// Copyright (c) 2015, 2016 Apsalar Inc. All rights reserved.
 //
 
 #pragma once
@@ -15,8 +15,8 @@
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/dynamic_message.h>
 
-#include <parquet-file/parquet-column.h>
-#include <parquet-file/parquet-file.h>
+#include <parquet-file2/parquet_column.h>
+#include <parquet-file2/parquet_file.h>
 
 namespace protobuf_schema_walker {
 
@@ -42,8 +42,8 @@ public:
         return m_path.back();
     }
 
-    parquet_file::ParquetColumn * column() {
-        return m_parqcolp;
+    parquet_file2::ParquetColumnHandle const & column() {
+        return m_pqcol;
     }
     
     void traverse(NodeTraverser & nt);
@@ -65,7 +65,7 @@ public:
     google::protobuf::FieldDescriptor const * m_fdp;
     int                                     m_maxreplvl;
     int                                     m_maxdeflvl;
-    parquet_file::ParquetColumn *           m_parqcolp;
+    parquet_file2::ParquetColumnHandle      m_pqcol;
     SchemaNodeSeq                           m_children;
     bool                                    m_dotrace;
 };
@@ -102,7 +102,7 @@ private:
     google::protobuf::DynamicMessageFactory     m_dmsgfact;
     google::protobuf::Message const *           m_proto;
 
-    parquet_file::ParquetFile * m_output;
+    parquet_file2::ParquetFile * m_output;
 
     SchemaNode * m_root;
     bool m_dotrace;
