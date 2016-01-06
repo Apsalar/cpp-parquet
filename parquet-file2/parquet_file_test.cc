@@ -63,30 +63,30 @@ class ParquetFileTest : public ::testing::Test {
 TEST_F(ParquetFileTest, AddColumn) {
     ParquetFile pqfile(m_output_filename);
 
-    ParquetColumnHandle pqh0
-        (new ParquetColumn({"root"},
-                           Type::INT32,	// ignored
-                           1, 1,
-                           FieldRepetitionType::REQUIRED,
-                           Encoding::PLAIN,
-                           CompressionCodec::UNCOMPRESSED));
+    ParquetColumnHandle pqh0 =
+        make_shared<ParquetColumn>(StringSeq({"root"}),
+                                   Type::INT32,	// ignored
+                                   1, 1,
+                                   FieldRepetitionType::REQUIRED,
+                                   Encoding::PLAIN,
+                                   CompressionCodec::UNCOMPRESSED);
 
-    ParquetColumnHandle pqh1
-        (new ParquetColumn({"root", "AllInts"},
-                           Type::INT32,
-                           1, 1,
-                           FieldRepetitionType::REQUIRED,
-                           Encoding::PLAIN,
-                           CompressionCodec::UNCOMPRESSED));
+    ParquetColumnHandle pqh1 =
+        make_shared<ParquetColumn>(StringSeq({"root", "AllInts"}),
+                                   Type::INT32,
+                                   1, 1,
+                                   FieldRepetitionType::REQUIRED,
+                                   Encoding::PLAIN,
+                                   CompressionCodec::UNCOMPRESSED);
     pqh0->add_child(pqh1);
 
-    ParquetColumnHandle pqh2
-        (new ParquetColumn({"root", "AllInts1"},
-                           Type::INT32,
-                           1, 1,
-                           FieldRepetitionType::REQUIRED,
-                           Encoding::PLAIN,
-                           CompressionCodec::UNCOMPRESSED));
+    ParquetColumnHandle pqh2 =
+        make_shared<ParquetColumn>(StringSeq({"root", "AllInts1"}),
+                                   Type::INT32,
+                                   1, 1,
+                                   FieldRepetitionType::REQUIRED,
+                                   Encoding::PLAIN,
+                                   CompressionCodec::UNCOMPRESSED);
     pqh0->add_child(pqh2);
 
     pqfile.set_root(pqh0);
