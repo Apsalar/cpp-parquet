@@ -242,7 +242,7 @@ ParquetColumn::encode_definition_levels()
         size_t maxbufsz =
             impala::RleEncoder::MaxBufferSize(bitwidth, m_meta.size());
         retval.resize(maxbufsz);
-        impala::RleEncoder encoder(retval.data(), maxbufsz, m_maxdeflvl);
+        impala::RleEncoder encoder(retval.data(), maxbufsz, bitwidth);
         for (auto md : m_meta)
             encoder.Put(md.m_deflvl);
         encoder.Flush();
