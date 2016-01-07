@@ -34,6 +34,7 @@ class ParquetColumn
 public:
     ParquetColumn(StringSeq const & i_path,
                   parquet::Type::type i_data_type,
+                  parquet::ConvertedType::type i_converted_type,
                   int i_maxreplvl,
                   int i_maxdeflvl,
                   parquet::FieldRepetitionType::type i_repetition_type,
@@ -48,6 +49,8 @@ public:
     std::string name() const;
 
     parquet::Type::type data_type() const;
+
+    parquet::ConvertedType::type converted_type() const;
 
     parquet::FieldRepetitionType::type repetition_type() const;
     
@@ -72,6 +75,8 @@ public:
     void traverse(Traverser & tt);
 
     void flush(int fd, apache::thrift::protocol::TCompactProtocol* protocol);
+
+    parquet::SchemaElement schema_element() const;
     
     parquet::ColumnMetaData metadata() const;
 
@@ -101,6 +106,7 @@ private:
     int m_maxreplvl;
     int m_maxdeflvl;
     parquet::Type::type m_data_type;
+    parquet::ConvertedType::type m_converted_type;
     parquet::FieldRepetitionType::type m_repetition_type;
     parquet::Encoding::type m_encoding;
     parquet::CompressionCodec::type m_compression_codec;

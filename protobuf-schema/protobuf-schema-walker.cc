@@ -194,6 +194,8 @@ SchemaNode::SchemaNode(StringSeq const & i_path,
     // Are we the root node?
     if (m_fdp == NULL) {
         parquet::Type::type data_type = parquet::Type::INT32;
+        parquet::ConvertedType::type converted_type =
+            parquet::ConvertedType::INT_32;
         FieldRepetitionType::type repetition_type =
             FieldRepetitionType::REQUIRED;
         Encoding::type encoding = Encoding::PLAIN;
@@ -203,6 +205,7 @@ SchemaNode::SchemaNode(StringSeq const & i_path,
         m_pqcol =
             make_shared<ParquetColumn>(i_path,
                                        data_type,
+                                       converted_type,
                                        m_maxreplvl,
                                        m_maxdeflvl,
                                        repetition_type,
@@ -211,41 +214,52 @@ SchemaNode::SchemaNode(StringSeq const & i_path,
     }
     else {
         parquet::Type::type data_type;
+        parquet::ConvertedType::type converted_type;
         switch (m_fdp->cpp_type()) {
         case FieldDescriptor::CPPTYPE_INT32:
             data_type = parquet::Type::INT32;
+            converted_type = parquet::ConvertedType::INT_32;
             break;
         case FieldDescriptor::CPPTYPE_INT64:
             data_type = parquet::Type::INT64;
+            converted_type = parquet::ConvertedType::INT_64;
             break;
         case FieldDescriptor::CPPTYPE_UINT32:
             LOG(WARNING) << "converting " << pathstr(i_path)
                          << " from uint32 to int32";
             data_type = parquet::Type::INT32;
+            converted_type = parquet::ConvertedType::UINT_32;
             break;
         case FieldDescriptor::CPPTYPE_UINT64:
             LOG(WARNING) << "converting " << pathstr(i_path)
                          << " from uint64 to int64";
             data_type = parquet::Type::INT64;
+            converted_type = parquet::ConvertedType::UINT_64;
             break;
         case FieldDescriptor::CPPTYPE_DOUBLE:
             data_type = parquet::Type::DOUBLE;
+            converted_type = parquet::ConvertedType::type(-1);
             break;
         case FieldDescriptor::CPPTYPE_FLOAT:
             data_type = parquet::Type::FLOAT;
+            converted_type = parquet::ConvertedType::type(-1);
             break;
         case FieldDescriptor::CPPTYPE_BOOL:
             data_type = parquet::Type::BOOLEAN;
+            converted_type = parquet::ConvertedType::type(-1);
             break;
         case FieldDescriptor::CPPTYPE_ENUM:
             LOG(FATAL) << "enum currently unsupported";
+            converted_type = parquet::ConvertedType::ENUM;
             break;
         case FieldDescriptor::CPPTYPE_STRING:
             data_type = parquet::Type::BYTE_ARRAY;
+            converted_type = parquet::ConvertedType::UTF8;
             break;
         case FieldDescriptor::CPPTYPE_MESSAGE:
             // This strikes me as bad; is there an out-of-band value instead?
             data_type = parquet::Type::INT32;
+            converted_type = parquet::ConvertedType::INT_32;
             break;
         default:
             LOG(FATAL) << "unsupported type: " << int(m_fdp->cpp_type());
@@ -265,6 +279,7 @@ SchemaNode::SchemaNode(StringSeq const & i_path,
         m_pqcol =
             make_shared<ParquetColumn>(i_path,
                                        data_type,
+                                       converted_type,
                                        m_maxreplvl,
                                        m_maxdeflvl,
                                        repetition_type,

@@ -43,19 +43,8 @@ ParquetFile::ParquetFile(string const & i_path)
 class SchemaBuilder : public ParquetColumn::Traverser
 {
 public:
-    virtual void operator()(ParquetColumnHandle const & ch)
-    {
-        SchemaElement elem;
-        elem.__set_name(ch->name());
-        elem.__set_repetition_type(ch->repetition_type());
-        // Parquet requires that we don't set the number of children if
-        // the schema element is for a data column.
-        if (ch->children().size() > 0) {
-            elem.__set_num_children(ch->children().size());
-        } else {
-            elem.__set_type(ch->data_type());
-        }
-        m_schema.push_back(elem);
+    virtual void operator()(ParquetColumnHandle const & ch) {
+        m_schema.push_back(ch->schema_element());
     }
     vector<SchemaElement> m_schema;
 };

@@ -66,6 +66,7 @@ TEST_F(ParquetFileTest, AddColumn) {
     ParquetColumnHandle pqh0 =
         make_shared<ParquetColumn>(StringSeq({"root"}),
                                    Type::INT32,	// ignored
+                                   ConvertedType::INT_32,
                                    1, 1,
                                    FieldRepetitionType::REQUIRED,
                                    Encoding::PLAIN,
@@ -74,6 +75,7 @@ TEST_F(ParquetFileTest, AddColumn) {
     ParquetColumnHandle pqh1 =
         make_shared<ParquetColumn>(StringSeq({"root", "AllInts"}),
                                    Type::INT32,
+                                   ConvertedType::INT_32,
                                    1, 1,
                                    FieldRepetitionType::REQUIRED,
                                    Encoding::PLAIN,
@@ -83,6 +85,7 @@ TEST_F(ParquetFileTest, AddColumn) {
     ParquetColumnHandle pqh2 =
         make_shared<ParquetColumn>(StringSeq({"root", "AllInts1"}),
                                    Type::INT32,
+                                   ConvertedType::INT_32,
                                    1, 1,
                                    FieldRepetitionType::REQUIRED,
                                    Encoding::PLAIN,

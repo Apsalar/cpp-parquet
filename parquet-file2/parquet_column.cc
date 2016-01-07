@@ -21,6 +21,7 @@ namespace parquet_file2 {
 
 ParquetColumn::ParquetColumn(StringSeq const & i_path,
                              Type::type i_data_type,
+                             ConvertedType::type i_converted_type,
                              int i_maxreplvl,
                              int i_maxdeflvl,
                              FieldRepetitionType::type i_repetition_type,
@@ -28,6 +29,7 @@ ParquetColumn::ParquetColumn(StringSeq const & i_path,
                              CompressionCodec::type i_compression_codec)
     : m_path(i_path)
     , m_data_type(i_data_type)
+    , m_converted_type(i_converted_type)
     , m_maxreplvl(i_maxreplvl)
     , m_maxdeflvl(i_maxdeflvl)
     , m_repetition_type(i_repetition_type)
@@ -73,6 +75,12 @@ Type::type
 ParquetColumn::data_type() const
 {
     return m_data_type;
+}
+
+ConvertedType::type
+ParquetColumn::converted_type() const
+{
+    return m_converted_type;
 }
 
 FieldRepetitionType::type
@@ -191,6 +199,24 @@ ParquetColumn::flush(int fd, TCompactProtocol * protocol)
     flush_buffer(fd, m_data);
 
     VLOG(2) << "\tFinal offset after write: " << lseek(fd, 0, SEEK_CUR);
+}
+
+SchemaElement
+ParquetColumn::schema_element() const
+{
+    SchemaElement elem;
+    elem.__set_name(name());
+    elem.__set_repetition_type(repetition_type());
+    // Parquet requires that we don't set the number of children if
+    // the schema element is for a data column.
+    if (children().size() > 0) {
+        elem.__set_num_children(children().size());
+    } else {
+        elem.__set_type(data_type());
+        if (converted_type() != -1)
+            elem.__set_converted_type(converted_type());
+    }
+    return move(elem);
 }
 
 ColumnMetaData
