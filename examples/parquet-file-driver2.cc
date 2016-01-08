@@ -22,14 +22,18 @@ int main(int argc, char* argv[]) {
   int NN = stoi(argv[2], NULL, 0);
 
   ParquetColumnHandle ch0
-      (new ParquetColumn({"root"}, parquet::Type::INT32,
+      (new ParquetColumn({"root"},
+                         parquet::Type::INT32,
+                         parquet::ConvertedType::INT_32,
                          1, 1,
                          FieldRepetitionType::REQUIRED,
                          Encoding::PLAIN,
                          CompressionCodec::UNCOMPRESSED));
 
   ParquetColumnHandle ch1
-      (new ParquetColumn({"root", "AllInts"}, parquet::Type::INT32,
+      (new ParquetColumn({"root", "AllInts"},
+                         parquet::Type::INT32,
+                         parquet::ConvertedType::INT_32,
                          1, 1,
                          FieldRepetitionType::REQUIRED,
                          Encoding::PLAIN,
@@ -37,7 +41,9 @@ int main(int argc, char* argv[]) {
   ch0->add_child(ch1);
 
   ParquetColumnHandle ch2
-      (new ParquetColumn({"root", "AllInts1"}, parquet::Type::INT32,
+      (new ParquetColumn({"root", "AllInts1"},
+                         parquet::Type::INT32,
+                         parquet::ConvertedType::INT_32,
                          1, 1,
                          FieldRepetitionType::REQUIRED,
                          Encoding::PLAIN,
