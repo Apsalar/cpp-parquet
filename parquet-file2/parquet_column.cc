@@ -222,11 +222,9 @@ ParquetColumn::schema_element() const
 ColumnMetaData
 ParquetColumn::metadata() const
 {
-    // We skip the leading element.
-    StringSeq tail;
-    for (size_t ndx = 1; ndx < m_path.size(); ++ndx)
-        tail.push_back(m_path[ndx]);
-
+    // We don't want the top-level name in the path here.
+    StringSeq topless(m_path.begin() + 1, m_path.end());
+    
     ColumnMetaData column_metadata;
     column_metadata.__set_type(m_data_type);
     column_metadata.__set_encodings({m_encoding});
@@ -235,7 +233,7 @@ ParquetColumn::metadata() const
     column_metadata.__set_total_uncompressed_size(m_uncompressed_size);
     column_metadata.__set_total_compressed_size(m_uncompressed_size);
     column_metadata.__set_data_page_offset(m_column_write_offset);
-    column_metadata.__set_path_in_schema(tail);
+    column_metadata.__set_path_in_schema(topless);
     return column_metadata;
 }
 
