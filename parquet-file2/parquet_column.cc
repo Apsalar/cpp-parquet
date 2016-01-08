@@ -222,9 +222,10 @@ ParquetColumn::schema_element() const
 ColumnMetaData
 ParquetColumn::metadata() const
 {
-    // Really not sure this is correct; it is what cpp-parquet does ...
+    // We skip the leading element.
     StringSeq tail;
-    tail.push_back(m_path.back());
+    for (size_t ndx = 1; ndx < m_path.size(); ++ndx)
+        tail.push_back(m_path[ndx]);
 
     ColumnMetaData column_metadata;
     column_metadata.__set_type(m_data_type);
