@@ -243,7 +243,7 @@ ParquetColumn::encode_repetition_levels()
 {
     OctetSeq retval;
 
-    if (m_repetition_type == FieldRepetitionType::REPEATED) {
+    if (m_maxreplvl > 0) {
         int bitwidth = impala::BitUtil::Log2(m_maxreplvl + 1);
         size_t maxbufsz =
             impala::RleEncoder::MaxBufferSize(bitwidth, m_meta.size());
@@ -263,7 +263,7 @@ ParquetColumn::encode_definition_levels()
 {
     OctetSeq retval;
 
-    if (m_repetition_type != FieldRepetitionType::REQUIRED) {
+    if (m_maxdeflvl > 0) {
         int bitwidth = impala::BitUtil::Log2(m_maxdeflvl + 1);
         size_t maxbufsz =
             impala::RleEncoder::MaxBufferSize(bitwidth, m_meta.size());
