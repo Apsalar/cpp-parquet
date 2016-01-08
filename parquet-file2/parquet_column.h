@@ -100,6 +100,8 @@ private:
 
     void flush_buffer(int fd, OctetBuffer const & i_buffer);
 
+    void flush_levels(int fd, OctetSeq const & i_seq);
+
     void flush_seq(int fd, OctetSeq const & i_seq);
 
     StringSeq m_path;

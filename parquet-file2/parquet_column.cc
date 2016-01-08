@@ -166,13 +166,13 @@ ParquetColumn::flush(int fd, TCompactProtocol * protocol)
     if (!enc_def_lvls.empty())
         m_uncompressed_size += 4;
 
-    DataPageHeader data_header;
     PageHeader page_header;
     page_header.__set_type(PageType::DATA_PAGE);
-
     page_header.__set_uncompressed_page_size(m_uncompressed_size);
     // Obviously, this is a stop gap until compression support is added.
     page_header.__set_compressed_page_size(m_uncompressed_size);
+
+    DataPageHeader data_header;
     data_header.__set_num_values(num_datum());
     data_header.__set_encoding(Encoding::PLAIN);
     // NB: For some reason, the following two must be set, even though
@@ -181,6 +181,7 @@ ParquetColumn::flush(int fd, TCompactProtocol * protocol)
     // parquet-dump.
     data_header.__set_definition_level_encoding(Encoding::RLE);
     data_header.__set_repetition_level_encoding(Encoding::RLE);
+
     page_header.__set_data_page_header(data_header);
     uint32_t page_header_size = page_header.write(protocol);
     m_uncompressed_size += page_header_size;
@@ -189,10 +190,10 @@ ParquetColumn::flush(int fd, TCompactProtocol * protocol)
     VLOG(2) << "\tTotal uncompressed bytes: " << m_uncompressed_size;
 
     if (!enc_rep_lvls.empty())
-        flush_seq(fd, enc_rep_lvls);
+        flush_levels(fd, enc_rep_lvls);
 
     if (!enc_def_lvls.empty())
-        flush_seq(fd, enc_def_lvls);
+        flush_levels(fd, enc_def_lvls);
 
     VLOG(2) << "\tData size: " << m_data.size();
 
@@ -247,7 +248,7 @@ ParquetColumn::encode_repetition_levels()
         size_t maxbufsz =
             impala::RleEncoder::MaxBufferSize(bitwidth, m_meta.size());
         retval.resize(maxbufsz);
-        impala::RleEncoder encoder(retval.data(), maxbufsz, m_maxreplvl);
+        impala::RleEncoder encoder(retval.data(), maxbufsz, bitwidth);
         for (auto md : m_meta)
             encoder.Put(md.m_replvl);
         encoder.Flush();
@@ -304,6 +305,24 @@ ParquetColumn::flush_buffer(int fd, OctetBuffer const & i_buffer)
 
         it = nit;
     }
+}
+
+void
+ParquetColumn::flush_levels(int fd, OctetSeq const & i_seq)
+{
+    // Write the size of the level data.
+    uint32_t sz = i_seq.size();
+    ssize_t rv = write(fd, &sz, sizeof(sz));
+    if (rv < 0) {
+        LOG(FATAL) << "flush_levels: write failed: " << strerror(errno);
+    }
+    else if (rv != sizeof(sz)) {
+        LOG(FATAL) << "flush_levels: unexpected write size:"
+                   << " expecting " << sizeof(sz) << ", saw " << rv;
+    }
+
+    // Write the level data itself.
+    flush_seq(fd, i_seq);
 }
 
 void
