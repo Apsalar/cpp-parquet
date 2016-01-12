@@ -214,58 +214,61 @@ SchemaNode::SchemaNode(StringSeq const & i_path,
     }
     else {
         parquet::Type::type data_type;
-        parquet::ConvertedType::type converted_type;
-        switch (m_fdp->cpp_type()) {
-        case FieldDescriptor::CPPTYPE_INT32:
-            data_type = parquet::Type::INT32;
-            converted_type = parquet::ConvertedType::INT_32;
+        parquet::ConvertedType::type converted_type =
+            parquet::ConvertedType::type(-1);
+
+        switch (m_fdp->type()) {
+        case FieldDescriptor::TYPE_DOUBLE:
+            data_type = parquet::Type::DOUBLE;
             break;
-        case FieldDescriptor::CPPTYPE_INT64:
+        case FieldDescriptor::TYPE_FLOAT:
+            data_type = parquet::Type::FLOAT;
+            break;
+        case FieldDescriptor::TYPE_INT64:
+        case FieldDescriptor::TYPE_SINT64:
+        case FieldDescriptor::TYPE_SFIXED64:
             data_type = parquet::Type::INT64;
-            converted_type = parquet::ConvertedType::INT_64;
             break;
-        case FieldDescriptor::CPPTYPE_UINT32:
-            LOG(WARNING) << "converting " << pathstr(i_path)
-                         << " from uint32 to int32";
-            data_type = parquet::Type::INT32;
-            converted_type = parquet::ConvertedType::UINT_32;
-            break;
-        case FieldDescriptor::CPPTYPE_UINT64:
-            LOG(WARNING) << "converting " << pathstr(i_path)
-                         << " from uint64 to int64";
+        case FieldDescriptor::TYPE_UINT64:
+        case FieldDescriptor::TYPE_FIXED64:
             data_type = parquet::Type::INT64;
             converted_type = parquet::ConvertedType::UINT_64;
             break;
-        case FieldDescriptor::CPPTYPE_DOUBLE:
-            data_type = parquet::Type::DOUBLE;
-            converted_type = parquet::ConvertedType::type(-1);
+        case FieldDescriptor::TYPE_INT32:
+        case FieldDescriptor::TYPE_SINT32:
+        case FieldDescriptor::TYPE_SFIXED32:
+            data_type = parquet::Type::INT32;
             break;
-        case FieldDescriptor::CPPTYPE_FLOAT:
-            data_type = parquet::Type::FLOAT;
-            converted_type = parquet::ConvertedType::type(-1);
+        case FieldDescriptor::TYPE_UINT32:
+        case FieldDescriptor::TYPE_FIXED32:
+            data_type = parquet::Type::INT32;
+            converted_type = parquet::ConvertedType::UINT_32;
             break;
-        case FieldDescriptor::CPPTYPE_BOOL:
+        case FieldDescriptor::TYPE_BOOL:
             data_type = parquet::Type::BOOLEAN;
-            converted_type = parquet::ConvertedType::type(-1);
             break;
-        case FieldDescriptor::CPPTYPE_ENUM:
-            LOG(FATAL) << "enum currently unsupported";
-            converted_type = parquet::ConvertedType::ENUM;
-            break;
-        case FieldDescriptor::CPPTYPE_STRING:
+        case FieldDescriptor::TYPE_STRING:
             data_type = parquet::Type::BYTE_ARRAY;
             converted_type = parquet::ConvertedType::UTF8;
             break;
-        case FieldDescriptor::CPPTYPE_MESSAGE:
+        case FieldDescriptor::TYPE_BYTES:
+            data_type = parquet::Type::BYTE_ARRAY;
+            break;
+        case FieldDescriptor::TYPE_MESSAGE:
+        case FieldDescriptor::TYPE_GROUP:
             // This strikes me as bad; is there an out-of-band value instead?
             data_type = parquet::Type::INT32;
             converted_type = parquet::ConvertedType::INT_32;
             break;
+        case FieldDescriptor::TYPE_ENUM:
+            LOG(FATAL) << "enum currently unsupported";
+            converted_type = parquet::ConvertedType::ENUM;
+            break;
         default:
-            LOG(FATAL) << "unsupported type: " << int(m_fdp->cpp_type());
+            LOG(FATAL) << "unsupported type: " << int(m_fdp->type());
             break;
         }
-
+        
         FieldRepetitionType::type repetition_type =
             m_fdp->is_required() ? FieldRepetitionType::REQUIRED :
             m_fdp->is_optional() ? FieldRepetitionType::OPTIONAL :
