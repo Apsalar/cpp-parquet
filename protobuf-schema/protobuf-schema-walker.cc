@@ -539,7 +539,7 @@ Schema::Schema(string const & i_protodir,
     unlink(outfile.c_str());
     m_output = new ParquetFile(outfile);
 
-    StringSeq path = { i_rootmsg };
+    StringSeq path = { m_typep->full_name() };
     m_root = traverse_root(path, m_typep, m_dotrace);
 
     m_output->set_root(m_root->column());
