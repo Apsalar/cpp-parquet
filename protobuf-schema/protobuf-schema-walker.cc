@@ -276,15 +276,14 @@ SchemaNode::SchemaNode(StringSeq const & i_path,
         CompressionCodec::type compression_codec =
             CompressionCodec::UNCOMPRESSED;
 
-        m_pqcol =
-            make_shared<ParquetColumn>(i_path,
-                                       data_type,
-                                       converted_type,
-                                       m_maxreplvl,
-                                       m_maxdeflvl,
-                                       repetition_type,
-                                       encoding,
-                                       compression_codec);
+        m_pqcol = make_shared<ParquetColumn>(i_path,
+                                             data_type,
+                                             converted_type,
+                                             m_maxreplvl,
+                                             m_maxdeflvl,
+                                             repetition_type,
+                                             encoding,
+                                             compression_codec);
     }
 }
 
@@ -383,7 +382,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                  << ", R:" << replvl << ", D:" << deflvl
                  << endl;
         }
-        m_pqcol->add_datum(NULL, 0, replvl, deflvl);
+        m_pqcol->add_fixed_datum(NULL, 0, replvl, deflvl);
     }
     else {
         switch (m_fdp->cpp_type()) {
@@ -397,7 +396,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                          << ", R:" << replvl << ", D:" << deflvl
                          << endl;
                 }
-                m_pqcol->add_datum(&val, sizeof(val), replvl, deflvl);
+                m_pqcol->add_fixed_datum(&val, sizeof(val), replvl, deflvl);
             }
             break;
         case FieldDescriptor::CPPTYPE_INT64:
@@ -410,7 +409,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                          << ", R:" << replvl << ", D:" << deflvl
                          << endl;
                 }
-                m_pqcol->add_datum(&val, sizeof(val), replvl, deflvl);
+                m_pqcol->add_fixed_datum(&val, sizeof(val), replvl, deflvl);
             }
             break;
         case FieldDescriptor::CPPTYPE_UINT32:
@@ -423,7 +422,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                          << ", R:" << replvl << ", D:" << deflvl
                          << endl;
                 }
-                m_pqcol->add_datum(&val, sizeof(val), replvl, deflvl);
+                m_pqcol->add_fixed_datum(&val, sizeof(val), replvl, deflvl);
             }
             break;
         case FieldDescriptor::CPPTYPE_UINT64:
@@ -436,7 +435,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                          << ", R:" << replvl << ", D:" << deflvl
                          << endl;
                 }
-                m_pqcol->add_datum(&val, sizeof(val), replvl, deflvl);
+                m_pqcol->add_fixed_datum(&val, sizeof(val), replvl, deflvl);
             }
             break;
         case FieldDescriptor::CPPTYPE_DOUBLE:
@@ -449,7 +448,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                          << ", R:" << replvl << ", D:" << deflvl
                          << endl;
                 }
-                m_pqcol->add_datum(&val, sizeof(val), replvl, deflvl);
+                m_pqcol->add_fixed_datum(&val, sizeof(val), replvl, deflvl);
             }
             break;
         case FieldDescriptor::CPPTYPE_FLOAT:
@@ -462,7 +461,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                          << ", R:" << replvl << ", D:" << deflvl
                          << endl;
                 }
-                m_pqcol->add_datum(&val, sizeof(val), replvl, deflvl);
+                m_pqcol->add_fixed_datum(&val, sizeof(val), replvl, deflvl);
             }
             break;
         case FieldDescriptor::CPPTYPE_BOOL:
@@ -475,7 +474,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                          << ", R:" << replvl << ", D:" << deflvl
                          << endl;
                 }
-                m_pqcol->add_datum(&val, sizeof(val), replvl, deflvl);
+                m_pqcol->add_fixed_datum(&val, sizeof(val), replvl, deflvl);
             }
             break;
         case FieldDescriptor::CPPTYPE_ENUM:
@@ -492,7 +491,8 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                          << ", R:" << replvl << ", D:" << deflvl
                          << endl;
                 }
-                m_pqcol->add_datum(val.data(), val.size(), replvl, deflvl);
+                m_pqcol->add_varlen_datum(val.data(), val.size(),
+                                          replvl, deflvl);
             }
             break;
         case FieldDescriptor::CPPTYPE_MESSAGE:

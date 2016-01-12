@@ -47,10 +47,10 @@ ParquetColumn::add_child(ParquetColumnHandle const & ch)
 }
 
 void
-ParquetColumn::add_datum(void const * i_ptr,
-                         size_t i_size,
-                         int i_replvl,
-                         int i_deflvl)
+ParquetColumn::add_fixed_datum(void const * i_ptr,
+                               size_t i_size,
+                               int i_replvl,
+                               int i_deflvl)
 {
     off_t beg = m_data.size();
 
@@ -60,6 +60,31 @@ ParquetColumn::add_datum(void const * i_ptr,
                       static_cast<uint8_t const *>(i_ptr) + i_size);
                       
     m_meta.push_back(MetaData(beg, i_size, i_replvl, i_deflvl));
+
+    if (i_replvl == 0)
+        ++m_numrecs;
+}
+
+void
+ParquetColumn::add_varlen_datum(void const * i_ptr,
+                                size_t i_size,
+                                int i_replvl,
+                                int i_deflvl)
+{
+    off_t beg = m_data.size();
+    size_t outsz = i_size;
+
+    if (i_ptr && i_size) {
+        uint32_t len = i_size;
+        uint8_t * lenptr = (uint8_t *) &len;
+        outsz += len;
+        m_data.insert(m_data.end(), lenptr, lenptr + sizeof(len));
+        m_data.insert(m_data.end(),
+                      static_cast<uint8_t const *>(i_ptr),
+                      static_cast<uint8_t const *>(i_ptr) + i_size);
+    }
+                      
+    m_meta.push_back(MetaData(beg, outsz, i_replvl, i_deflvl));
 
     if (i_replvl == 0)
         ++m_numrecs;

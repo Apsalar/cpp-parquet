@@ -43,8 +43,11 @@ public:
 
     void add_child(ParquetColumnHandle const & ch);
 
-    void add_datum(void const * i_ptr, size_t i_size,
-                   int i_replvl, int i_deflvl);
+    void add_fixed_datum(void const * i_ptr, size_t i_size,
+                         int i_replvl, int i_deflvl);
+
+    void add_varlen_datum(void const * i_ptr, size_t i_size,
+                          int i_replvl, int i_deflvl);
 
     std::string name() const;
 

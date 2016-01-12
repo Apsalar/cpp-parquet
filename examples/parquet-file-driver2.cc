@@ -53,8 +53,8 @@ int main(int argc, char* argv[]) {
   output.set_root(ch0);
 
   for (int32_t ii = 0; ii < NN; ++ii) {
-      ch1->add_datum(&ii, sizeof(ii), 0, 0);
-      ch2->add_datum(&ii, sizeof(ii), 0, 0);
+      ch1->add_fixed_datum(&ii, sizeof(ii), 0, 0);
+      ch2->add_fixed_datum(&ii, sizeof(ii), 0, 0);
   }
 
   output.flush();

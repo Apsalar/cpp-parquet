@@ -97,8 +97,8 @@ TEST_F(ParquetFileTest, AddColumn) {
     int nrecs = 100;
     
     for (int32_t ii = 0; ii < nrecs; ++ii) {
-        pqh1->add_datum(&ii, sizeof(ii), 0, 0);
-        pqh2->add_datum(&ii, sizeof(ii), 0, 0);
+        pqh1->add_fixed_datum(&ii, sizeof(ii), 0, 0);
+        pqh2->add_fixed_datum(&ii, sizeof(ii), 0, 0);
     }
 
     CHECK_EQ(pqh1->num_records(), nrecs) << "num_records incorrect";
