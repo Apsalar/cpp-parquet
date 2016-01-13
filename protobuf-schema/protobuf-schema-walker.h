@@ -93,7 +93,7 @@ public:
 private:
     void traverse(NodeTraverser & nt);
 
-    bool process_record(std::istream & istrm);
+    bool process_record(std::istream & istrm, size_t recnum);
     
     google::protobuf::compiler::DiskSourceTree  m_srctree;
     google::protobuf::compiler::MultiFileErrorCollector * m_errcollp;

@@ -74,14 +74,14 @@ ParquetColumn::add_varlen_datum(void const * i_ptr,
     off_t beg = m_data.size();
     size_t outsz = i_size;
 
-    if (i_ptr && i_size) {
+    if (i_ptr) {
         uint32_t len = i_size;
         uint8_t * lenptr = (uint8_t *) &len;
-        outsz += len;
         m_data.insert(m_data.end(), lenptr, lenptr + sizeof(len));
         m_data.insert(m_data.end(),
                       static_cast<uint8_t const *>(i_ptr),
                       static_cast<uint8_t const *>(i_ptr) + i_size);
+        outsz += len;
     }
                       
     m_meta.push_back(MetaData(beg, outsz, i_replvl, i_deflvl));

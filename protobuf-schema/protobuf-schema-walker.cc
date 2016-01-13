@@ -385,7 +385,14 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                  << ", R:" << replvl << ", D:" << deflvl
                  << endl;
         }
-        m_pqcol->add_fixed_datum(NULL, 0, replvl, deflvl);
+        switch (m_fdp->cpp_type()) {
+        case FieldDescriptor::CPPTYPE_STRING:
+            m_pqcol->add_varlen_datum(NULL, 0, replvl, deflvl);
+            break;
+        default:
+            m_pqcol->add_fixed_datum(NULL, 0, replvl, deflvl);
+            break;
+        }
     }
     else {
         switch (m_fdp->cpp_type()) {
@@ -564,7 +571,7 @@ Schema::convert(string const & infile)
     size_t nrecs = 0;
     bool more = true;
     while (more) {
-        more = process_record(istrm);
+        more = process_record(istrm, nrecs);
         if (m_dotrace) {
             cerr << endl;
         }
@@ -587,7 +594,7 @@ Schema::traverse(NodeTraverser & nt)
 }
 
 bool
-Schema::process_record(istream & istrm)
+Schema::process_record(istream & istrm, size_t recnum)
 {
     // Read the record header, swap bytes as necessary.
     int16_t proto;
@@ -615,7 +622,9 @@ Schema::process_record(istream & istrm)
     inmsg->ParseFromString(buffer);
 
     if (m_dotrace)
-        cerr << inmsg->DebugString() << endl;
+        cerr << "Record: " << recnum+1 << endl
+             << endl
+             << inmsg->DebugString() << endl;
     
     m_root->propagate_message(inmsg, 0, 0);
     
