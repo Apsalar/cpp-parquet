@@ -614,6 +614,9 @@ Schema::process_record(istream & istrm)
     Message * inmsg = m_proto->New();
     inmsg->ParseFromString(buffer);
 
+    if (m_dotrace)
+        cerr << inmsg->DebugString() << endl;
+    
     m_root->propagate_message(inmsg, 0, 0);
     
     return true;
