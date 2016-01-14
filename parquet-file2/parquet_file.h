@@ -31,6 +31,8 @@ public:
     ParquetFile(std::string const & i_path);
 
     void set_root(ParquetColumnHandle const & rh);
+
+    void flush_row_group();
     
     void flush();
 
@@ -41,6 +43,12 @@ private:
     boost::shared_ptr<TFDTransport> m_file_transport;
     boost::shared_ptr<TCompactProtocol> m_protocol;
     ParquetColumnHandle m_root;
+
+    ParquetColumnSeq m_leaf_cols;
+
+    size_t m_num_rows;
+    
+    std::vector<parquet::RowGroup> m_row_groups;
 };
 
 } // end namespace parquet_file2
