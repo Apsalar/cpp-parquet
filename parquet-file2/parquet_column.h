@@ -65,8 +65,6 @@ public:
     
     size_t num_records() const;
 
-    size_t num_datum() const;
-
     size_t data_size() const;
 
     class Traverser
@@ -83,29 +81,40 @@ public:
     
     parquet::ColumnMetaData metadata() const;
 
+    void reset_row_group_state();
+
 private:
-    struct MetaData {
-        size_t	m_beg;
-        size_t	m_size;
+    struct MetaData
+    {
         int		m_replvl;
         int		m_deflvl;
 
-        MetaData(size_t i_beg, size_t i_size, int i_replvl, int i_deflvl)
-            : m_beg(i_beg), m_size(i_size)
-            , m_replvl(i_replvl), m_deflvl(i_deflvl)
+        MetaData(int i_replvl, int i_deflvl)
+            : m_replvl(i_replvl), m_deflvl(i_deflvl)
         {}
     };
     typedef std::deque<MetaData> MetaDataSeq;
-    
+
+    struct DataPage
+    {
+        parquet::PageHeader	m_page_header;
+        OctetSeq			m_rep_levels;
+        OctetSeq			m_def_levels;
+        OctetSeq			m_data;
+
+        size_t flush(int fd,
+                     apache::thrift::protocol::TCompactProtocol* protocol);
+    };
+    typedef std::shared_ptr<DataPage> DataPageHandle;
+    typedef std::deque<DataPageHandle> DataPageSeq;
+
     OctetSeq encode_repetition_levels();
 
     OctetSeq encode_definition_levels();
 
-    void flush_buffer(int fd, OctetBuffer const & i_buffer);
-
-    void flush_levels(int fd, OctetSeq const & i_seq);
-
-    void flush_seq(int fd, OctetSeq const & i_seq);
+    void push_page();
+    
+    void reset_page_state();
 
     StringSeq m_path;
     int m_maxreplvl;
@@ -117,11 +126,15 @@ private:
     parquet::CompressionCodec::type m_compression_codec;
 
     ParquetColumnSeq m_children;
-    
+
+    // Page accumulation
     OctetBuffer m_data;
     MetaDataSeq m_meta;
 
-    size_t m_numrecs;
+    // Row-Group accumulation
+    DataPageSeq m_pages;
+    size_t m_num_recs;
+    size_t m_num_values;
     off_t m_column_write_offset;
     size_t m_uncompressed_size;
 };

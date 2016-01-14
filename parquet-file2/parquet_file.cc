@@ -103,10 +103,6 @@ ParquetFile::flush_row_group()
     for (auto it = m_leaf_cols.begin(); it != m_leaf_cols.end(); ++it) {
         ParquetColumnHandle const & ch = *it;
 
-        // We only write out leaf nodes.
-        if (!ch->is_leaf())
-            continue;
-
         ch->flush(m_fd, m_protocol.get());
         ColumnMetaData column_metadata = ch->metadata();
 
@@ -119,6 +115,8 @@ ParquetFile::flush_row_group()
         column_chunk.__set_file_offset(column_metadata.data_page_offset);
         column_chunk.__set_meta_data(column_metadata);
         column_chunks.push_back(column_chunk);
+
+        ch->reset_row_group_state();
     }
     row_group.__set_columns(column_chunks);
 
