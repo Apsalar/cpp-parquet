@@ -19,8 +19,6 @@ using apache::thrift::protocol::TCompactProtocol;
 
 namespace parquet_file2 {
 
-size_t const PAGE_SIZE = 16 * 1024;
-
 ParquetColumn::ParquetColumn(StringSeq const & i_path,
                              Type::type i_data_type,
                              ConvertedType::type i_converted_type,
@@ -37,8 +35,13 @@ ParquetColumn::ParquetColumn(StringSeq const & i_path,
     , m_repetition_type(i_repetition_type)
     , m_encoding(i_encoding)
     , m_compression_codec(i_compression_codec)
-    , m_num_recs(0)
-    , m_num_values(0)
+    , m_num_page_values(0)
+    , m_rep_enc(m_rep_buf, sizeof(m_rep_buf),
+                impala::BitUtil::Log2(i_maxreplvl + 1))
+    , m_def_enc(m_def_buf, sizeof(m_def_buf),
+                impala::BitUtil::Log2(i_maxdeflvl + 1))
+    , m_num_rowgrp_recs(0)
+    , m_num_rowgrp_values(0)
     , m_column_write_offset(-1L)
     , m_uncompressed_size(0)
 {
@@ -56,18 +59,12 @@ ParquetColumn::add_fixed_datum(void const * i_ptr,
                                int i_replvl,
                                int i_deflvl)
 {
-    if (m_data.size() + i_size > PAGE_SIZE)
-        push_page();
+    add_levels(i_size, i_replvl, i_deflvl);
     
     if (i_ptr)
         m_data.insert(m_data.end(),
                       static_cast<uint8_t const *>(i_ptr),
                       static_cast<uint8_t const *>(i_ptr) + i_size);
-                      
-    m_meta.push_back(MetaData(i_replvl, i_deflvl));
-
-    if (i_replvl == 0)
-        ++m_num_recs;
 }
 
 void
@@ -76,8 +73,7 @@ ParquetColumn::add_varlen_datum(void const * i_ptr,
                                 int i_replvl,
                                 int i_deflvl)
 {
-    if (m_data.size() + i_size > PAGE_SIZE)
-        push_page();
+    add_levels(i_size, i_replvl, i_deflvl);
     
     if (i_ptr) {
         uint32_t len = i_size;
@@ -87,11 +83,6 @@ ParquetColumn::add_varlen_datum(void const * i_ptr,
                       static_cast<uint8_t const *>(i_ptr),
                       static_cast<uint8_t const *>(i_ptr) + i_size);
     }
-                      
-    m_meta.push_back(MetaData(i_replvl, i_deflvl));
-
-    if (i_replvl == 0)
-        ++m_num_recs;
 }
 
 string
@@ -146,9 +137,9 @@ ParquetColumn::is_leaf() const
 }
 
 size_t
-ParquetColumn::num_records() const
+ParquetColumn::num_rowgrp_records() const
 {
-    return m_num_recs;
+    return m_num_rowgrp_recs;
 }
 
 size_t
@@ -170,7 +161,7 @@ void
 ParquetColumn::flush(int fd, TCompactProtocol * protocol)
 {
     // If there are no pages or any remaining data push a page.
-    if (m_pages.empty() || !m_meta.empty())
+    if (m_num_page_values)
         push_page();
 
     m_column_write_offset = lseek(fd, 0, SEEK_CUR);
@@ -207,7 +198,7 @@ ParquetColumn::metadata() const
     column_metadata.__set_type(m_data_type);
     column_metadata.__set_encodings({m_encoding});
     column_metadata.__set_codec(m_compression_codec);
-    column_metadata.__set_num_values(m_num_values);
+    column_metadata.__set_num_values(m_num_rowgrp_values);
     column_metadata.__set_total_uncompressed_size(m_uncompressed_size);
     column_metadata.__set_total_compressed_size(m_uncompressed_size);
     column_metadata.__set_data_page_offset(m_column_write_offset);
@@ -221,50 +212,10 @@ ParquetColumn::reset_row_group_state()
     reset_page_state();
 
     m_pages.clear();
-    m_num_recs = 0L;
-    m_num_values = 0L;
+    m_num_rowgrp_recs = 0L;
+    m_num_rowgrp_values = 0L;
     m_column_write_offset = -1L;
     m_uncompressed_size = 0L;
-}
-
-OctetSeq
-ParquetColumn::encode_repetition_levels()
-{
-    OctetSeq retval;
-
-    if (m_maxreplvl > 0) {
-        int bitwidth = impala::BitUtil::Log2(m_maxreplvl + 1);
-        size_t maxbufsz =
-            impala::RleEncoder::MaxBufferSize(bitwidth, m_meta.size());
-        retval.resize(maxbufsz);
-        impala::RleEncoder encoder(retval.data(), maxbufsz, bitwidth);
-        for (auto md : m_meta)
-            encoder.Put(md.m_replvl);
-        encoder.Flush();
-        retval.resize(encoder.len());
-    }
-
-    return move(retval);
-}
-
-OctetSeq
-ParquetColumn::encode_definition_levels()
-{
-    OctetSeq retval;
-
-    if (m_maxdeflvl > 0) {
-        int bitwidth = impala::BitUtil::Log2(m_maxdeflvl + 1);
-        size_t maxbufsz =
-            impala::RleEncoder::MaxBufferSize(bitwidth, m_meta.size());
-        retval.resize(maxbufsz);
-        impala::RleEncoder encoder(retval.data(), maxbufsz, bitwidth);
-        for (auto md : m_meta)
-            encoder.Put(md.m_deflvl);
-        encoder.Flush();
-        retval.resize(encoder.len());
-    }
-
-    return move(retval);
 }
 
 void
@@ -311,15 +262,37 @@ ParquetColumn::DataPage::flush(int fd, TCompactProtocol * protocol)
 }
 
 void
+ParquetColumn::add_levels(size_t i_size, int i_replvl, int i_deflvl)
+{
+    if (m_data.size() + i_size > PAGE_SIZE ||
+        m_rep_enc.IsFull() ||
+        m_def_enc.IsFull())
+        push_page();
+
+    if (m_maxreplvl > 0)
+        m_rep_enc.Put(i_replvl);
+
+    if (m_maxdeflvl > 0)
+        m_def_enc.Put(i_deflvl);
+
+    ++m_num_page_values;
+
+    if (i_replvl == 0)
+        ++m_num_rowgrp_recs;
+}
+
+void
 ParquetColumn::push_page()
 {
     DataPageHandle dph = make_shared<DataPage>();
 
-    dph->m_rep_levels = encode_repetition_levels();
-    dph->m_def_levels = encode_definition_levels();
+    m_rep_enc.Flush();
+    dph->m_rep_levels.assign(m_rep_buf, m_rep_buf + m_rep_enc.len());
 
-    dph->m_data.reserve(m_data.size());
-    dph->m_data.insert(dph->m_data.end(), m_data.begin(), m_data.end());
+    m_def_enc.Flush();
+    dph->m_def_levels.assign(m_def_buf, m_def_buf + m_def_enc.len());
+
+    dph->m_data.assign(m_data.begin(), m_data.end());
 
     size_t uncompressed_page_size =
         m_data.size() + dph->m_rep_levels.size() + dph->m_def_levels.size();
@@ -335,7 +308,7 @@ ParquetColumn::push_page()
     dph->m_page_header.__set_compressed_page_size(uncompressed_page_size);
 
     DataPageHeader data_header;
-    data_header.__set_num_values(m_meta.size());
+    data_header.__set_num_values(m_num_page_values);
     data_header.__set_encoding(Encoding::PLAIN);
     // NB: For some reason, the following two must be set, even though
     // they can default to PLAIN, even for required/nonrepeating fields.
@@ -347,7 +320,7 @@ ParquetColumn::push_page()
     dph->m_page_header.__set_data_page_header(data_header);
 
     m_pages.push_back(dph);
-    m_num_values += m_meta.size();
+    m_num_rowgrp_values += m_num_page_values;
     m_uncompressed_size += uncompressed_page_size;
 
     reset_page_state();
@@ -357,7 +330,9 @@ void
 ParquetColumn::reset_page_state()
 {
     m_data.clear();
-    m_meta.clear();
+    m_num_page_values = 0;
+    m_rep_enc.Clear();
+    m_def_enc.Clear();
 }
 
 } // end namespace parquet_file2

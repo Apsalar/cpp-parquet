@@ -14,6 +14,8 @@
 
 #include <glog/logging.h>
 
+#include "parquet-file/util/rle-encoding.h"
+
 #include <thrift/protocol/TCompactProtocol.h>
 
 #include "parquet_types.h"
@@ -63,7 +65,7 @@ public:
 
     bool is_leaf() const;
     
-    size_t num_records() const;
+    size_t num_rowgrp_records() const;
 
     size_t data_size() const;
 
@@ -84,16 +86,7 @@ public:
     void reset_row_group_state();
 
 private:
-    struct MetaData
-    {
-        int		m_replvl;
-        int		m_deflvl;
-
-        MetaData(int i_replvl, int i_deflvl)
-            : m_replvl(i_replvl), m_deflvl(i_deflvl)
-        {}
-    };
-    typedef std::deque<MetaData> MetaDataSeq;
+    static size_t const PAGE_SIZE = 64 * 1024;
 
     struct DataPage
     {
@@ -108,9 +101,7 @@ private:
     typedef std::shared_ptr<DataPage> DataPageHandle;
     typedef std::deque<DataPageHandle> DataPageSeq;
 
-    OctetSeq encode_repetition_levels();
-
-    OctetSeq encode_definition_levels();
+    void add_levels(size_t i_size, int i_replvl, int i_deflvl);
 
     void push_page();
     
@@ -129,12 +120,16 @@ private:
 
     // Page accumulation
     OctetBuffer m_data;
-    MetaDataSeq m_meta;
+    size_t m_num_page_values;
+    uint8_t m_rep_buf[PAGE_SIZE];
+    uint8_t m_def_buf[PAGE_SIZE];
+    impala::RleEncoder m_rep_enc;
+    impala::RleEncoder m_def_enc;
 
     // Row-Group accumulation
     DataPageSeq m_pages;
-    size_t m_num_recs;
-    size_t m_num_values;
+    size_t m_num_rowgrp_recs;
+    size_t m_num_rowgrp_values;
     off_t m_column_write_offset;
     size_t m_uncompressed_size;
 };

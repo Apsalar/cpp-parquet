@@ -162,6 +162,9 @@ class RleEncoder {
     return std::max(MinBufferSize(bit_width), literal_max_size);
   }
 
+  /// Is the buffer full?
+  bool IsFull();
+  
   /// Encode value.  Returns true if the value fits in buffer, false otherwise.
   /// This value must be representable with bit_width_ bits.
   bool Put(uint64_t value);
@@ -282,6 +285,10 @@ bool RleDecoder::NextCounts() {
   return true;
 }
 
+inline bool RleEncoder::IsFull() {
+    return buffer_full_;
+}
+ 
 /// This function buffers input values 8 at a time.  After seeing all 8 values,
 /// it decides whether they should be encoded as a literal or repeated run.
 inline bool RleEncoder::Put(uint64_t value) {

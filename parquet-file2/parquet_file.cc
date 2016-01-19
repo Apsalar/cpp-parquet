@@ -88,7 +88,7 @@ ParquetFile::flush_row_group()
     set<size_t> colnrecs;
     for (auto it = m_leaf_cols.begin(); it != m_leaf_cols.end(); ++it) {
         ParquetColumnHandle const & ch = *it;
-            colnrecs.insert((*it)->num_records());
+            colnrecs.insert((*it)->num_rowgrp_records());
     }
     LOG_IF(FATAL, colnrecs.size() > 1)
         << "all leaf columns must have the same number of record; "

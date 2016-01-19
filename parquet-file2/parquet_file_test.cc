@@ -101,7 +101,7 @@ TEST_F(ParquetFileTest, AddColumn) {
         pqh2->add_fixed_datum(&ii, sizeof(ii), 0, 0);
     }
 
-    CHECK_EQ(pqh1->num_records(), nrecs) << "num_records incorrect";
+    CHECK_EQ(pqh1->num_rowgrp_records(), nrecs) << "num_records incorrect";
 
     pqfile.flush();
 }
