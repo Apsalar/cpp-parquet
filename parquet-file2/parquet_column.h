@@ -91,9 +91,7 @@ private:
     struct DataPage
     {
         parquet::PageHeader	m_page_header;
-        OctetSeq			m_rep_levels;
-        OctetSeq			m_def_levels;
-        OctetSeq			m_data;
+        OctetSeq			m_page_data;
 
         size_t flush(int fd,
                      apache::thrift::protocol::TCompactProtocol* protocol);
@@ -121,11 +119,11 @@ private:
     // Page accumulation
     OctetBuffer m_data;
     size_t m_num_page_values;
-    uint8_t m_rep_buf[PAGE_SIZE];
-    uint8_t m_def_buf[PAGE_SIZE];
     impala::RleEncoder m_rep_enc;
     impala::RleEncoder m_def_enc;
-
+    uint8_t m_rep_buf[PAGE_SIZE];
+    uint8_t m_def_buf[PAGE_SIZE];
+    
     // Row-Group accumulation
     DataPageSeq m_pages;
     size_t m_num_rowgrp_recs;

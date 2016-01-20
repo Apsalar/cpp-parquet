@@ -5,6 +5,8 @@
 // All rights reserved.
 //
 
+#include <bzlib.h>
+
 #include "parquet_types.h"
 
 #include "parquet-file/util/bit-util.h"
@@ -218,6 +220,7 @@ ParquetColumn::reset_row_group_state()
     m_uncompressed_size = 0L;
 }
 
+#if 0
 void
 flush_seq(int fd, OctetSeq const & i_seq)
 {
@@ -248,16 +251,20 @@ flush_levels(int fd, OctetSeq const & i_seq)
     // Write the level data itself.
     flush_seq(fd, i_seq);
 }
+#endif
 
 size_t
 ParquetColumn::DataPage::flush(int fd, TCompactProtocol * protocol)
 {
     size_t header_size = m_page_header.write(protocol);
-    if (!m_rep_levels.empty())
-        flush_levels(fd, m_rep_levels);
-    if (!m_def_levels.empty())
-        flush_levels(fd, m_def_levels);
-    flush_seq(fd, m_data);
+    ssize_t rv = write(fd, m_page_data.data(), m_page_data.size());
+    if (rv < 0) {
+        LOG(FATAL) << "flush: write failed: " << strerror(errno);
+    }
+    else if (rv != m_page_data.size()) {
+        LOG(FATAL) << "flush: unexpected write size:"
+                   << " expecting " << m_page_data.size() << ", saw " << rv;
+    }
     return header_size;
 }
 
@@ -287,25 +294,86 @@ ParquetColumn::push_page()
     DataPageHandle dph = make_shared<DataPage>();
 
     m_rep_enc.Flush();
-    dph->m_rep_levels.assign(m_rep_buf, m_rep_buf + m_rep_enc.len());
-
     m_def_enc.Flush();
-    dph->m_def_levels.assign(m_def_buf, m_def_buf + m_def_enc.len());
-
-    dph->m_data.assign(m_data.begin(), m_data.end());
 
     size_t uncompressed_page_size =
-        m_data.size() + dph->m_rep_levels.size() + dph->m_def_levels.size();
+        m_data.size() + m_rep_enc.len() + m_def_enc.len();
 
-    if (! dph->m_rep_levels.empty())
+    size_t compressed_page_size;
+    
+    if (m_rep_enc.len())
         uncompressed_page_size += 4;
-    if (! dph->m_def_levels.empty())
+    if (m_def_enc.len())
         uncompressed_page_size += 4;
+
+    OctetSeq & out = dph->m_page_data;
+    
+    if (m_compression_codec == CompressionCodec::UNCOMPRESSED) {
+        out.reserve(uncompressed_page_size);
+        uint32_t len;
+        uint8_t * lenptr = (uint8_t *) &len;
+        len = m_rep_enc.len();
+        if (len) {
+            out.insert(out.end(), lenptr, lenptr + sizeof(len));
+            out.insert(out.end(), m_rep_buf, m_rep_buf + len);
+        }
+        len = m_def_enc.len();
+        if (len) {
+            out.insert(out.end(), lenptr, lenptr + sizeof(len));
+            out.insert(out.end(), m_def_buf, m_def_buf + len);
+        }
+        out.insert(out.end(), m_data.begin(), m_data.end());
+        compressed_page_size = uncompressed_page_size;
+    }
+    else if (m_compression_codec == CompressionCodec::GZIP) {
+        // FIXME - this routine can be improved by using the lower
+        // level GZIP interface and compressing the data in batches.
+        // Instead we copy all the batches together first and then
+        // compress with the simpler interface.  See:
+        // http://www.bzip.org/1.0.3/html/low-level.html
+        //
+        OctetSeq src;
+        src.reserve(uncompressed_page_size);
+        uint32_t len;
+        uint8_t * lenptr = (uint8_t *) &len;
+        len = m_rep_enc.len();
+        if (len) {
+            out.insert(src.end(), lenptr, lenptr + sizeof(len));
+            src.insert(src.end(), m_rep_buf, m_rep_buf + len);
+        }
+        len = m_def_enc.len();
+        if (len) {
+            out.insert(src.end(), lenptr, lenptr + sizeof(len));
+            src.insert(src.end(), m_def_buf, m_def_buf + len);
+        }
+        src.insert(src.end(), m_data.begin(), m_data.end());
+        
+        // NOTE - we use a temporary buffer so we can shrink-fit the
+        // actual page buffer.  The temporary buffer is worst-case
+        // sized per http://www.bzip.org/1.0.3/html/util-fns.html
+        size_t maxsz = (101 * uncompressed_page_size) + 600;
+        OctetSeq tmp(maxsz);
+        unsigned int dstlen = tmp.size();
+        int rv =
+            BZ2_bzBuffToBuffCompress((char *) tmp.data(),
+                                     &dstlen,
+                                     (char *) src.data(),
+                                     src.size(),
+                                     5, 2, 0);
+        if (rv != BZ_OK) {
+            LOG(FATAL) << "BZ2_bzBuffToBuffCompress failed: " << rv;
+        }
+        out.assign(tmp.begin(), tmp.begin() + dstlen);
+        compressed_page_size = dstlen;
+    }
+    else {
+        LOG(FATAL) << "unsupported compression codec: "
+                   << int(m_compression_codec);
+    }
 
     dph->m_page_header.__set_type(PageType::DATA_PAGE);
     dph->m_page_header.__set_uncompressed_page_size(uncompressed_page_size);
-    // Obviously, this is a stop gap until compression support is added.
-    dph->m_page_header.__set_compressed_page_size(uncompressed_page_size);
+    dph->m_page_header.__set_compressed_page_size(compressed_page_size);
 
     DataPageHeader data_header;
     data_header.__set_num_values(m_num_page_values);

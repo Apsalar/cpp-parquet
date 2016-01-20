@@ -1,7 +1,7 @@
 //
 // Schema related functions
 //
-// Copyright (c) 2015 Apsalar Inc. All rights reserved.
+// Copyright (c) 2015, 2016 Apsalar Inc. All rights reserved.
 //
 
 #include <arpa/inet.h>
