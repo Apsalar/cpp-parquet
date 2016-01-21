@@ -563,15 +563,23 @@ Schema::dump(ostream & ostrm)
 void
 Schema::convert(string const & infile)
 {
-    ifstream istrm(infile.c_str(), ifstream::in | ifstream::binary);
-    if (!istrm.good()) {
-        LOG(FATAL) << "trouble opening input file: " << infile;
+    ifstream ifstrm;
+    istream * istrmp;
+    if (infile == "-") {
+        istrmp = &cin;
+    }
+    else {
+        ifstrm.open(infile.c_str(), ifstream::in | ifstream::binary);
+        if (!ifstrm.good()) {
+            LOG(FATAL) << "trouble opening input file: " << infile;
+        }
+        istrmp = &ifstrm;
     }
 
     size_t nrecs = 0;
     bool more = true;
     while (more) {
-        more = process_record(istrm, nrecs);
+        more = process_record(*istrmp, nrecs);
         if (m_dotrace) {
             cerr << endl;
         }
