@@ -133,6 +133,7 @@ private:
     size_t m_num_rowgrp_values;
     off_t m_column_write_offset;
     size_t m_uncompressed_size;
+    size_t m_compressed_size;
 };
 
 } // end namespace parquet_file2

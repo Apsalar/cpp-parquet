@@ -277,7 +277,7 @@ SchemaNode::SchemaNode(StringSeq const & i_path,
         Encoding::type encoding = Encoding::PLAIN;
 
         CompressionCodec::type compression_codec =
-            CompressionCodec::GZIP;
+            CompressionCodec::SNAPPY;
 
         m_pqcol = make_shared<ParquetColumn>(i_path,
                                              data_type,

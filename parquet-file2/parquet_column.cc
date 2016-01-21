@@ -47,6 +47,7 @@ ParquetColumn::ParquetColumn(StringSeq const & i_path,
     , m_num_rowgrp_values(0)
     , m_column_write_offset(-1L)
     , m_uncompressed_size(0)
+    , m_compressed_size(0)
 {
 }
 
@@ -169,8 +170,11 @@ ParquetColumn::flush(int fd, TCompactProtocol * protocol)
 
     m_column_write_offset = lseek(fd, 0, SEEK_CUR);
 
-    for (DataPageHandle dph : m_pages)
-        m_uncompressed_size += dph->flush(fd, protocol);
+    for (DataPageHandle dph : m_pages) {
+        size_t header_size = dph->flush(fd, protocol);
+        m_uncompressed_size += header_size;
+        m_compressed_size += header_size;
+    }
 }
 
 SchemaElement
@@ -203,7 +207,7 @@ ParquetColumn::metadata() const
     column_metadata.__set_codec(m_compression_codec);
     column_metadata.__set_num_values(m_num_rowgrp_values);
     column_metadata.__set_total_uncompressed_size(m_uncompressed_size);
-    column_metadata.__set_total_compressed_size(m_uncompressed_size);
+    column_metadata.__set_total_compressed_size(m_compressed_size);
     column_metadata.__set_data_page_offset(m_column_write_offset);
     column_metadata.__set_path_in_schema(topless);
     return column_metadata;
@@ -219,6 +223,7 @@ ParquetColumn::reset_row_group_state()
     m_num_rowgrp_values = 0L;
     m_column_write_offset = -1L;
     m_uncompressed_size = 0L;
+    m_compressed_size = 0L;
 }
 
 size_t
@@ -340,10 +345,6 @@ ParquetColumn::push_page()
                    << int(m_compression_codec);
     }
 
-    dph->m_page_header.__set_type(PageType::DATA_PAGE);
-    dph->m_page_header.__set_uncompressed_page_size(uncompressed_page_size);
-    dph->m_page_header.__set_compressed_page_size(compressed_page_size);
-
     DataPageHeader data_header;
     data_header.__set_num_values(m_num_page_values);
     data_header.__set_encoding(Encoding::PLAIN);
@@ -354,11 +355,15 @@ ParquetColumn::push_page()
     data_header.__set_definition_level_encoding(Encoding::RLE);
     data_header.__set_repetition_level_encoding(Encoding::RLE);
 
+    dph->m_page_header.__set_type(PageType::DATA_PAGE);
+    dph->m_page_header.__set_uncompressed_page_size(uncompressed_page_size);
+    dph->m_page_header.__set_compressed_page_size(compressed_page_size);
     dph->m_page_header.__set_data_page_header(data_header);
 
     m_pages.push_back(dph);
     m_num_rowgrp_values += m_num_page_values;
     m_uncompressed_size += uncompressed_page_size;
+    m_compressed_size += compressed_page_size;
 
     reset_page_state();
 }
