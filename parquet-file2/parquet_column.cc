@@ -161,8 +161,8 @@ ParquetColumn::traverse(Traverser & tt)
     }
 }
 
-void
-ParquetColumn::flush(int fd, TCompactProtocol * protocol)
+ColumnMetaData
+ParquetColumn::flush_row_group(int fd, TCompactProtocol * protocol)
 {
     // If there are no pages or any remaining data push a page.
     if (m_num_page_values)
@@ -175,6 +175,23 @@ ParquetColumn::flush(int fd, TCompactProtocol * protocol)
         m_uncompressed_size += header_size;
         m_compressed_size += header_size;
     }
+
+    // We don't want the top-level name in the path here.
+    StringSeq topless(m_path.begin() + 1, m_path.end());
+    
+    ColumnMetaData column_metadata;
+    column_metadata.__set_type(m_data_type);
+    column_metadata.__set_encodings({m_encoding});
+    column_metadata.__set_codec(m_compression_codec);
+    column_metadata.__set_num_values(m_num_rowgrp_values);
+    column_metadata.__set_total_uncompressed_size(m_uncompressed_size);
+    column_metadata.__set_total_compressed_size(m_compressed_size);
+    column_metadata.__set_data_page_offset(m_column_write_offset);
+    column_metadata.__set_path_in_schema(topless);
+
+    reset_row_group_state();
+    
+    return column_metadata;
 }
 
 SchemaElement
@@ -193,37 +210,6 @@ ParquetColumn::schema_element() const
             elem.__set_converted_type(converted_type());
     }
     return move(elem);
-}
-
-ColumnMetaData
-ParquetColumn::metadata() const
-{
-    // We don't want the top-level name in the path here.
-    StringSeq topless(m_path.begin() + 1, m_path.end());
-    
-    ColumnMetaData column_metadata;
-    column_metadata.__set_type(m_data_type);
-    column_metadata.__set_encodings({m_encoding});
-    column_metadata.__set_codec(m_compression_codec);
-    column_metadata.__set_num_values(m_num_rowgrp_values);
-    column_metadata.__set_total_uncompressed_size(m_uncompressed_size);
-    column_metadata.__set_total_compressed_size(m_compressed_size);
-    column_metadata.__set_data_page_offset(m_column_write_offset);
-    column_metadata.__set_path_in_schema(topless);
-    return column_metadata;
-}
-
-void
-ParquetColumn::reset_row_group_state()
-{
-    reset_page_state();
-
-    m_pages.clear();
-    m_num_rowgrp_recs = 0L;
-    m_num_rowgrp_values = 0L;
-    m_column_write_offset = -1L;
-    m_uncompressed_size = 0L;
-    m_compressed_size = 0L;
 }
 
 size_t
@@ -395,6 +381,19 @@ ParquetColumn::reset_page_state()
     m_num_page_values = 0;
     m_rep_enc.Clear();
     m_def_enc.Clear();
+}
+
+void
+ParquetColumn::reset_row_group_state()
+{
+    reset_page_state();
+
+    m_pages.clear();
+    m_num_rowgrp_recs = 0L;
+    m_num_rowgrp_values = 0L;
+    m_column_write_offset = -1L;
+    m_uncompressed_size = 0L;
+    m_compressed_size = 0L;
 }
 
 } // end namespace parquet_file2

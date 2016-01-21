@@ -103,8 +103,8 @@ ParquetFile::flush_row_group()
     for (auto it = m_leaf_cols.begin(); it != m_leaf_cols.end(); ++it) {
         ParquetColumnHandle const & ch = *it;
 
-        ch->flush(m_fd, m_protocol.get());
-        ColumnMetaData column_metadata = ch->metadata();
+        ColumnMetaData column_metadata =
+            ch->flush_row_group(m_fd, m_protocol.get());
 
         row_group.__set_total_byte_size
             (row_group.total_byte_size +
@@ -115,8 +115,6 @@ ParquetFile::flush_row_group()
         column_chunk.__set_file_offset(column_metadata.data_page_offset);
         column_chunk.__set_meta_data(column_metadata);
         column_chunks.push_back(column_chunk);
-
-        ch->reset_row_group_state();
     }
     row_group.__set_columns(column_chunks);
 

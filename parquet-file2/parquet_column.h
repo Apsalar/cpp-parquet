@@ -77,13 +77,10 @@ public:
 
     void traverse(Traverser & tt);
 
-    void flush(int fd, apache::thrift::protocol::TCompactProtocol* protocol);
+    parquet::ColumnMetaData flush_row_group(int fd,
+                    apache::thrift::protocol::TCompactProtocol * protocol);
 
     parquet::SchemaElement schema_element() const;
-    
-    parquet::ColumnMetaData metadata() const;
-
-    void reset_row_group_state();
 
 private:
     static size_t const PAGE_SIZE = 64 * 1024;
@@ -106,6 +103,8 @@ private:
     void concatenate_page_data(OctetSeq & buffer);
 
     void reset_page_state();
+    
+    void reset_row_group_state();
 
     StringSeq m_path;
     int m_maxreplvl;
