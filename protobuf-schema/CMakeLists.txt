@@ -4,4 +4,4 @@
 ADD_LIBRARY(libprotobufschemawalker protobuf-schema-walker.cc)
 
 ADD_EXECUTABLE(protobuf-parquet-encoder protobuf-parquet-encoder.cc)
-TARGET_LINK_LIBRARIES (protobuf-parquet-encoder libprotobufschemawalker glog libcppparquet2 libprotobufschemawalker protobuf parquet-thrift thrift bz2 pthread)
+TARGET_LINK_LIBRARIES (protobuf-parquet-encoder libprotobufschemawalker glog libcppparquet2 libprotobufschemawalker protobuf parquet-thrift thrift snappy z pthread)

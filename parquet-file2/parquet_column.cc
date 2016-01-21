@@ -5,7 +5,8 @@
 // All rights reserved.
 //
 
-#include <bzlib.h>
+#include <snappy.h>
+#include <zlib.h>
 
 #include "parquet_types.h"
 
@@ -220,39 +221,6 @@ ParquetColumn::reset_row_group_state()
     m_uncompressed_size = 0L;
 }
 
-#if 0
-void
-flush_seq(int fd, OctetSeq const & i_seq)
-{
-    ssize_t rv = write(fd, i_seq.data(), i_seq.size());
-    if (rv < 0) {
-        LOG(FATAL) << "flush_seq: write failed: " << strerror(errno);
-    }
-    else if (rv != i_seq.size()) {
-        LOG(FATAL) << "flush_seq: unexpected write size:"
-                   << " expecting " << i_seq.size() << ", saw " << rv;
-    }
-}
-
-void
-flush_levels(int fd, OctetSeq const & i_seq)
-{
-    // Write the size of the level data.
-    uint32_t sz = i_seq.size();
-    ssize_t rv = write(fd, &sz, sizeof(sz));
-    if (rv < 0) {
-        LOG(FATAL) << "flush_levels: write failed: " << strerror(errno);
-    }
-    else if (rv != sizeof(sz)) {
-        LOG(FATAL) << "flush_levels: unexpected write size:"
-                   << " expecting " << sizeof(sz) << ", saw " << rv;
-    }
-
-    // Write the level data itself.
-    flush_seq(fd, i_seq);
-}
-#endif
-
 size_t
 ParquetColumn::DataPage::flush(int fd, TCompactProtocol * protocol)
 {
@@ -310,61 +278,62 @@ ParquetColumn::push_page()
     
     if (m_compression_codec == CompressionCodec::UNCOMPRESSED) {
         out.reserve(uncompressed_page_size);
-        uint32_t len;
-        uint8_t * lenptr = (uint8_t *) &len;
-        len = m_rep_enc.len();
-        if (len) {
-            out.insert(out.end(), lenptr, lenptr + sizeof(len));
-            out.insert(out.end(), m_rep_buf, m_rep_buf + len);
-        }
-        len = m_def_enc.len();
-        if (len) {
-            out.insert(out.end(), lenptr, lenptr + sizeof(len));
-            out.insert(out.end(), m_def_buf, m_def_buf + len);
-        }
-        out.insert(out.end(), m_data.begin(), m_data.end());
+        concatenate_page_data(out);
         compressed_page_size = uncompressed_page_size;
     }
-    else if (m_compression_codec == CompressionCodec::GZIP) {
-        // FIXME - this routine can be improved by using the lower
-        // level GZIP interface and compressing the data in batches.
-        // Instead we copy all the batches together first and then
-        // compress with the simpler interface.  See:
-        // http://www.bzip.org/1.0.3/html/low-level.html
+    else if (m_compression_codec == CompressionCodec::SNAPPY) {
+        // NOTE - I don't see how to run snappy in partial increments,
+        // so I think we are forced to pre-concatenate the input into a
+        // single buffer prior to compression.
         //
-        OctetSeq src;
-        src.reserve(uncompressed_page_size);
-        uint32_t len;
-        uint8_t * lenptr = (uint8_t *) &len;
-        len = m_rep_enc.len();
-        if (len) {
-            out.insert(src.end(), lenptr, lenptr + sizeof(len));
-            src.insert(src.end(), m_rep_buf, m_rep_buf + len);
+        m_concat_buffer.reserve(uncompressed_page_size);
+        concatenate_page_data(m_concat_buffer);
+        OctetSeq tmp(snappy::MaxCompressedLength(uncompressed_page_size));
+        snappy::RawCompress((char const *) m_concat_buffer.data(),
+                            m_concat_buffer.size(),
+                            (char *) tmp.data(),
+                            &compressed_page_size);
+        tmp.resize(compressed_page_size);
+        out.assign(tmp.begin(), tmp.end());
+    }
+    else if (m_compression_codec == CompressionCodec::GZIP) {
+        // FIXME - this routine can be improved by running the
+        // compressor over the three input "batches".  For simplicity
+        // we concatenate all the input batches together and compress
+        // in one swoop.
+        //
+        m_concat_buffer.reserve(uncompressed_page_size);
+        concatenate_page_data(m_concat_buffer);
+
+        int window_bits = 15 + 16; // maximum window + GZIP
+        z_stream stream;
+        memset(&stream, '\0', sizeof(stream));
+        int rv = deflateInit2(&stream,
+                              Z_DEFAULT_COMPRESSION,
+                              Z_DEFLATED,
+                              window_bits,
+                              9,
+                              Z_DEFAULT_STRATEGY);
+        if (rv != Z_OK) {
+            LOG(FATAL) << "deflateInit2 failed: " << rv;
         }
-        len = m_def_enc.len();
-        if (len) {
-            out.insert(src.end(), lenptr, lenptr + sizeof(len));
-            src.insert(src.end(), m_def_buf, m_def_buf + len);
-        }
-        src.insert(src.end(), m_data.begin(), m_data.end());
-        
-        // NOTE - we use a temporary buffer so we can shrink-fit the
-        // actual page buffer.  The temporary buffer is worst-case
-        // sized per http://www.bzip.org/1.0.3/html/util-fns.html
-        size_t maxsz = (101 * uncompressed_page_size) + 600;
+        size_t maxsz = deflateBound(&stream, uncompressed_page_size);
         OctetSeq tmp(maxsz);
-        unsigned int dstlen = tmp.size();
-        int rv =
-            BZ2_bzBuffToBuffCompress((char *) tmp.data(),
-                                     &dstlen,
-                                     (char *) src.data(),
-                                     src.size(),
-                                     5, 2, 0);
-        if (rv != BZ_OK) {
-            LOG(FATAL) << "BZ2_bzBuffToBuffCompress failed: " << rv;
+        stream.next_in =
+            const_cast<Bytef*>
+            (reinterpret_cast<const Bytef*>
+             (m_concat_buffer.data()));
+        stream.avail_in = m_concat_buffer.size();
+        stream.next_out = reinterpret_cast<Bytef*>(tmp.data());
+        stream.avail_out = tmp.size();
+        rv = deflate(&stream, Z_FINISH);
+        if (rv != Z_STREAM_END) {
+            LOG(FATAL) << "gzip deflate failed: " << rv;
         }
-        out.assign(tmp.begin(), tmp.begin() + dstlen);
-        compressed_page_size = dstlen;
+
+        out.assign(tmp.begin(), tmp.begin() + stream.total_out);
+        compressed_page_size = stream.total_out;
+        deflateEnd(&stream);
     }
     else {
         LOG(FATAL) << "unsupported compression codec: "
@@ -392,6 +361,26 @@ ParquetColumn::push_page()
     m_uncompressed_size += uncompressed_page_size;
 
     reset_page_state();
+}
+
+void
+ParquetColumn::concatenate_page_data(OctetSeq & buf)
+{
+    buf.clear();		// Doesn't release memory
+
+    uint32_t len;
+    uint8_t * lenptr = (uint8_t *) &len;
+    len = m_rep_enc.len();
+    if (len) {
+        buf.insert(buf.end(), lenptr, lenptr + sizeof(len));
+        buf.insert(buf.end(), m_rep_buf, m_rep_buf + len);
+    }
+    len = m_def_enc.len();
+    if (len) {
+        buf.insert(buf.end(), lenptr, lenptr + sizeof(len));
+        buf.insert(buf.end(), m_def_buf, m_def_buf + len);
+    }
+    buf.insert(buf.end(), m_data.begin(), m_data.end());
 }
 
 void

@@ -103,6 +103,8 @@ private:
 
     void push_page();
     
+    void concatenate_page_data(OctetSeq & buffer);
+
     void reset_page_state();
 
     StringSeq m_path;
@@ -123,6 +125,7 @@ private:
     impala::RleEncoder m_def_enc;
     uint8_t m_rep_buf[PAGE_SIZE];
     uint8_t m_def_buf[PAGE_SIZE];
+    OctetSeq m_concat_buffer;
     
     // Row-Group accumulation
     DataPageSeq m_pages;
