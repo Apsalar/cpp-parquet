@@ -160,7 +160,6 @@ int run(int & argc, char ** & argv)
 
     if (!g_infile.empty()) {
         schema.convert(g_infile);
-        schema.flush();
     }
     
     return 0;

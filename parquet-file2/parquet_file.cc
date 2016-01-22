@@ -80,6 +80,45 @@ ParquetFile::set_root(ParquetColumnHandle const & col)
     }
 }
 
+class RowGroupSizer : public ParquetColumn::Traverser
+{
+public:
+    RowGroupSizer() : m_rowgrp_size(0L) {}
+    
+    virtual void operator()(ParquetColumnHandle const & ch) {
+        m_rowgrp_size += ch->rowgrp_size();
+    }
+    size_t m_rowgrp_size;
+};
+
+void
+ParquetFile::check_rowgrp_size()
+{
+    // Check the aggregate row group size and flush if we are getting
+    // too big.
+
+    RowGroupSizer sizer;
+    sizer(m_root);
+    m_root->traverse(sizer);
+
+    if (sizer.m_rowgrp_size >= ROW_GROUP_SIZE)
+        flush_row_group();
+}
+
+void
+ParquetFile::flush()
+{
+    flush_row_group();
+    
+    m_file_meta_data.__set_num_rows(m_num_rows);
+    m_file_meta_data.__set_row_groups(m_row_groups);
+    
+    uint32_t file_metadata_length = m_file_meta_data.write(m_protocol.get());
+    write(m_fd, &file_metadata_length, sizeof(file_metadata_length));
+    write(m_fd, PARQUET_MAGIC, strlen(PARQUET_MAGIC));
+    close(m_fd);
+}
+
 void
 ParquetFile::flush_row_group()
 {
@@ -119,20 +158,6 @@ ParquetFile::flush_row_group()
     row_group.__set_columns(column_chunks);
 
     m_row_groups.push_back(row_group);
-}
-
-void
-ParquetFile::flush()
-{
-    flush_row_group();
-    
-    m_file_meta_data.__set_num_rows(m_num_rows);
-    m_file_meta_data.__set_row_groups(m_row_groups);
-    
-    uint32_t file_metadata_length = m_file_meta_data.write(m_protocol.get());
-    write(m_fd, &file_metadata_length, sizeof(file_metadata_length));
-    write(m_fd, PARQUET_MAGIC, strlen(PARQUET_MAGIC));
-    close(m_fd);
 }
 
 } // end namespace parquet_file2

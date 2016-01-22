@@ -67,7 +67,7 @@ public:
     
     size_t num_rowgrp_records() const;
 
-    size_t data_size() const;
+    size_t rowgrp_size() const;
 
     class Traverser
     {

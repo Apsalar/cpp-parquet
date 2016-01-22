@@ -147,9 +147,9 @@ ParquetColumn::num_rowgrp_records() const
 }
 
 size_t
-ParquetColumn::data_size() const
+ParquetColumn::rowgrp_size() const
 {
-    return m_data.size();
+    return m_compressed_size;
 }
 
 void

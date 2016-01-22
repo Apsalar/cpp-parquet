@@ -586,13 +586,8 @@ Schema::convert(string const & infile)
         if (more)
             ++nrecs;
     }
-    cerr << "processed " << nrecs << " records" << endl;
-}
-
-void
-Schema::flush()
-{
     m_output->flush();
+    cerr << "processed " << nrecs << " records" << endl;
 }
 
 void
@@ -604,6 +599,8 @@ Schema::traverse(NodeTraverser & nt)
 bool
 Schema::process_record(istream & istrm, size_t recnum)
 {
+    m_output->check_rowgrp_size();
+
     // Read the record header, swap bytes as necessary.
     int16_t proto;
     int8_t type;

@@ -32,11 +32,15 @@ public:
 
     void set_root(ParquetColumnHandle const & rh);
 
-    void flush_row_group();
-    
+    void check_rowgrp_size();
+
     void flush();
 
 private:
+    static size_t const ROW_GROUP_SIZE = 256 * 1024 * 1024;
+    
+    void flush_row_group();
+    
     std::string m_path;
     int m_fd;
     FileMetaData m_file_meta_data;

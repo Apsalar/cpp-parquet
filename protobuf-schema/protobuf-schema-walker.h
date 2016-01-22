@@ -89,8 +89,6 @@ public:
 
     void convert(std::string const & infile);
 
-    void flush();
-
 private:
     void traverse(NodeTraverser & nt);
 
