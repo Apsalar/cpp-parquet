@@ -27,11 +27,13 @@ char const * DEF_PROTODIR = "./";
 char const * DEF_PROTOFILE = "";
 char const * DEF_ROOTMSG = "";
 char const * DEF_INFILE = "";
+char const * DEF_OUTFILE = "";
 
 string g_protodir = DEF_PROTODIR;
 string g_protofile = DEF_PROTOFILE;
 string g_rootmsg = DEF_ROOTMSG;
 string g_infile = DEF_INFILE;
+string g_outfile = DEF_OUTFILE;
 bool g_dodump = false;    
 bool g_dotrace = false;    
     
@@ -44,7 +46,8 @@ usage(int & argc, char ** & argv)
          << "    -d, --protodir=DIR    protobuf src dir    [" << DEF_PROTODIR << "]" << endl
          << "    -p, --protofile=FILE  protobuf src file   [" << DEF_PROTOFILE << "]" << endl
          << "    -m, --rootmsg=MSG     root message name   [" << DEF_ROOTMSG << "]" << endl
-         << "    -i, --infile=FILE     protobuf data input [" << DEF_INFILE << "]" << endl
+         << "    -i, --infile=PATH     protobuf data input [" << DEF_INFILE << "]" << endl
+         << "    -o, --outfile=PATH    parquet output file [" << DEF_OUTFILE << "]" << endl
          << "    -u, --dump            pretty print the schema to stderr" << endl
          << "    -t, --trace           trace input traversal" << endl
         ;
@@ -62,6 +65,7 @@ parse_arguments(int & argc, char ** & argv)
             {"protofile",               required_argument,  0, 'p'},
             {"rootmsg",                 required_argument,  0, 'm'},
             {"infile",                  required_argument,  0, 'i'},
+            {"outfile",                 required_argument,  0, 'o'},
             {"dump",                    no_argument,        0, 'u'},
             {"trace",                   no_argument,        0, 't'},
             {0, 0, 0, 0}
@@ -70,7 +74,7 @@ parse_arguments(int & argc, char ** & argv)
     while (true)
     {
         int optndx = 0;
-        int opt = getopt_long(argc, argv, "hd:p:m:i:u",
+        int opt = getopt_long(argc, argv, "hd:p:m:i:o:u",
                               long_options, &optndx);
 
         // Are we done processing arguments?
@@ -97,6 +101,10 @@ parse_arguments(int & argc, char ** & argv)
 
         case 'i':
             g_infile = optarg;
+            break;
+
+        case 'o':
+            g_outfile = optarg;
             break;
 
         case 'u':
@@ -132,6 +140,12 @@ parse_arguments(int & argc, char ** & argv)
         usage(argc, argv);
         exit(1);
     }
+
+    if (!g_infile.empty() && g_outfile.empty()) {
+        cerr << "missing outfile argument" << endl;
+        usage(argc, argv);
+        exit(1);
+    }
 }
 
     
@@ -139,7 +153,7 @@ int run(int & argc, char ** & argv)
 {
     google::InitGoogleLogging(argv[0]);
     parse_arguments(argc, argv);
-    Schema schema(g_protodir, g_protofile, g_rootmsg, g_dotrace);
+    Schema schema(g_protodir, g_protofile, g_rootmsg, g_outfile, g_dotrace);
 
     if (g_dodump)
         schema.dump(cerr);

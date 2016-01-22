@@ -524,6 +524,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
 Schema::Schema(string const & i_protodir,
                string const & i_protofile,
                string const & i_rootmsg,
+               string const & i_outfile,
                bool i_dotrace)
     : m_dotrace(i_dotrace)
 {
@@ -542,9 +543,8 @@ Schema::Schema(string const & i_protodir,
 
     m_proto = m_dmsgfact.GetPrototype(m_typep);
 
-    string outfile = "./output.parquet";
-    unlink(outfile.c_str());
-    m_output = new ParquetFile(outfile);
+    unlink(i_outfile.c_str());
+    m_output = new ParquetFile(i_outfile);
 
     StringSeq path = { m_typep->full_name() };
     m_root = traverse_root(path, m_typep, m_dotrace);

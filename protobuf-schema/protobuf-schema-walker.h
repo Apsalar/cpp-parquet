@@ -82,6 +82,7 @@ public:
     Schema(std::string const & i_protodir,
            std::string const & i_protofile,
            std::string const & i_rootmsg,
+           std::string const & i_outfile,
            bool i_dotrace);
 
     void dump(std::ostream & ostrm);
