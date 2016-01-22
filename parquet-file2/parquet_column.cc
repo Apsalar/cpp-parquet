@@ -43,6 +43,8 @@ ParquetColumn::ParquetColumn(StringSeq const & i_path,
                 impala::BitUtil::Log2(i_maxreplvl + 1))
     , m_def_enc(m_def_buf, sizeof(m_def_buf),
                 impala::BitUtil::Log2(i_maxdeflvl + 1))
+    , m_bool_buf(0)
+    , m_bool_cnt(0)
     , m_num_rowgrp_recs(0)
     , m_num_rowgrp_values(0)
     , m_column_write_offset(-1L)
@@ -86,6 +88,26 @@ ParquetColumn::add_varlen_datum(void const * i_ptr,
         m_data.insert(m_data.end(),
                       static_cast<uint8_t const *>(i_ptr),
                       static_cast<uint8_t const *>(i_ptr) + i_size);
+    }
+}
+
+void
+ParquetColumn::add_boolean_datum(bool i_val,
+                                 int i_replvl,
+                                 int i_deflvl)
+{
+    add_levels(1, i_replvl, i_deflvl);
+
+    if (i_val)
+        m_bool_buf |= (1 << m_bool_cnt);
+    ++m_bool_cnt;
+
+    if (m_bool_cnt == 8) {
+        m_data.insert(m_data.end(),
+                      static_cast<uint8_t const *>(&m_bool_buf),
+                      static_cast<uint8_t const *>(&m_bool_buf) + 1);
+        m_bool_buf = 0;
+        m_bool_cnt = 0;
     }
 }
 
@@ -255,6 +277,14 @@ ParquetColumn::push_page()
     m_rep_enc.Flush();
     m_def_enc.Flush();
 
+    if (m_bool_cnt) {
+        m_data.insert(m_data.end(),
+                      static_cast<uint8_t const *>(&m_bool_buf),
+                      static_cast<uint8_t const *>(&m_bool_buf) + 1);
+        m_bool_buf = 0;
+        m_bool_cnt = 0;
+    }
+
     size_t uncompressed_page_size =
         m_data.size() + m_rep_enc.len() + m_def_enc.len();
 
@@ -381,6 +411,8 @@ ParquetColumn::reset_page_state()
     m_num_page_values = 0;
     m_rep_enc.Clear();
     m_def_enc.Clear();
+    m_bool_buf = 0;
+    m_bool_cnt = 0;
 }
 
 void

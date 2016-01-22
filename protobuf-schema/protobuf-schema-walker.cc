@@ -484,7 +484,7 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
                          << ", R:" << replvl << ", D:" << deflvl
                          << endl;
                 }
-                m_pqcol->add_fixed_datum(&val, sizeof(val), replvl, deflvl);
+                m_pqcol->add_boolean_datum(val, replvl, deflvl);
             }
             break;
         case FieldDescriptor::CPPTYPE_ENUM:

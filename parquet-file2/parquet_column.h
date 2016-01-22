@@ -51,6 +51,9 @@ public:
     void add_varlen_datum(void const * i_ptr, size_t i_size,
                           int i_replvl, int i_deflvl);
 
+    void add_boolean_datum(bool i_val,
+                           int i_replvl, int i_deflvl);
+
     std::string name() const;
 
     parquet::Type::type data_type() const;
@@ -125,6 +128,8 @@ private:
     uint8_t m_rep_buf[PAGE_SIZE];
     uint8_t m_def_buf[PAGE_SIZE];
     OctetSeq m_concat_buffer;
+    uint8_t m_bool_buf;
+    int m_bool_cnt;
     
     // Row-Group accumulation
     DataPageSeq m_pages;
