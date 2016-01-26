@@ -61,7 +61,7 @@ class ParquetFileTest : public ::testing::Test {
 
 // Test that we can add a column and some data.
 TEST_F(ParquetFileTest, AddColumn) {
-    ParquetFile pqfile(m_output_filename);
+    ParquetFile pqfile(m_output_filename, 256);
 
     ParquetColumnHandle pqh0 =
         make_shared<ParquetColumn>(StringSeq({"root"}),

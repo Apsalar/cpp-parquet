@@ -7,6 +7,7 @@
 #pragma once
 
 #include <iostream>
+#include <memory>
 #include <ostream>
 #include <string>
 #include <vector>
@@ -23,7 +24,8 @@ namespace protobuf_schema_walker {
 typedef std::vector<std::string> StringSeq;
 
 class SchemaNode;
-typedef std::vector<SchemaNode *> SchemaNodeSeq;
+typedef std::shared_ptr<SchemaNode> SchemaNodeHandle;
+typedef std::vector<SchemaNodeHandle> SchemaNodeSeq;
 
 class NodeTraverser;
 
@@ -36,7 +38,7 @@ public:
                int i_maxdeflvl,
                bool i_dotrace);
 
-    void add_child(SchemaNode * i_child);
+    void add_child(SchemaNodeHandle const & i_child);
 
     std::string const & name() {
         return m_path.back();
@@ -83,6 +85,7 @@ public:
            std::string const & i_protofile,
            std::string const & i_rootmsg,
            std::string const & i_outfile,
+           size_t i_rowgrpsz,
            bool i_dotrace);
 
     void dump(std::ostream & ostrm);
@@ -103,7 +106,7 @@ private:
 
     std::unique_ptr<parquet_file2::ParquetFile> m_output;
 
-    std::unique_ptr<SchemaNode> m_root;
+    SchemaNodeHandle m_root;
     bool m_dotrace;
 };
 

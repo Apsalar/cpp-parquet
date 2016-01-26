@@ -28,7 +28,7 @@ namespace parquet_file2 {
 class ParquetFile
 {
 public:
-    ParquetFile(std::string const & i_path);
+    ParquetFile(std::string const & i_path, size_t i_rowgrpsz);
 
     void set_root(ParquetColumnHandle const & rh);
 
@@ -37,11 +37,11 @@ public:
     void flush();
 
 private:
-    static size_t const ROW_GROUP_SIZE = 256 * 1024 * 1024;
-    
     void flush_row_group();
     
     std::string m_path;
+    size_t m_rowgrpsz;
+    
     int m_fd;
     FileMetaData m_file_meta_data;
     boost::shared_ptr<TFDTransport> m_file_transport;

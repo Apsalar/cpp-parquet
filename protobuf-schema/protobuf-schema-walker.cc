@@ -76,7 +76,7 @@ private:
     ostream & m_ostrm;
 };
 
-SchemaNode *
+SchemaNodeHandle
 traverse_leaf(StringSeq & path,
               FieldDescriptor const * i_fd,
               int i_maxreplvl,
@@ -86,12 +86,13 @@ traverse_leaf(StringSeq & path,
     int maxreplvl = i_fd->is_repeated() ? i_maxreplvl + 1 : i_maxreplvl;
     int maxdeflvl = i_fd->is_required() ? i_maxdeflvl : i_maxdeflvl + 1;
 
-    SchemaNode * retval = new SchemaNode(path, NULL, i_fd,
-                                         maxreplvl, maxdeflvl, i_dotrace);
-    return retval;
+    SchemaNodeHandle retval =
+        make_shared<SchemaNode>(path, (Descriptor *) NULL, i_fd,
+                                maxreplvl, maxdeflvl, i_dotrace);
+    return move(retval);
 }
 
-SchemaNode *
+SchemaNodeHandle
 traverse_group(StringSeq & path,
                FieldDescriptor const * i_fd,
                int i_maxreplvl,
@@ -103,8 +104,9 @@ traverse_group(StringSeq & path,
     int maxreplvl = i_fd->is_repeated() ? i_maxreplvl + 1 : i_maxreplvl;
     int maxdeflvl = i_fd->is_required() ? i_maxdeflvl : i_maxdeflvl + 1;
 
-    SchemaNode * retval = new SchemaNode(path, dd, i_fd,
-                                         maxreplvl, maxdeflvl, i_dotrace);
+    SchemaNodeHandle retval =
+        make_shared<SchemaNode>(path, dd, i_fd,
+                                maxreplvl, maxdeflvl, i_dotrace);
     
     for (int ndx = 0; ndx < dd->field_count(); ++ndx) {
         FieldDescriptor const * fd = dd->field(ndx);
@@ -112,14 +114,14 @@ traverse_group(StringSeq & path,
         switch (fd->cpp_type()) {
         case FieldDescriptor::CPPTYPE_MESSAGE:
             {
-                SchemaNode * child =
+                SchemaNodeHandle child =
                     traverse_group(path, fd, maxreplvl, maxdeflvl, i_dotrace);
                 retval->add_child(child);
             }
             break;
         default:
             {
-                SchemaNode * child =
+                SchemaNodeHandle child =
                     traverse_leaf(path, fd, maxreplvl, maxdeflvl, i_dotrace);
                 retval->add_child(child);
             }
@@ -128,13 +130,15 @@ traverse_group(StringSeq & path,
         path.pop_back();
     }
 
-    return retval;
+    return move(retval);
 }
 
-SchemaNode *
+SchemaNodeHandle
 traverse_root(StringSeq & path, Descriptor const * dd, bool dotrace)
 {
-    SchemaNode * retval = new SchemaNode(path, dd, NULL, 0, 0, dotrace);
+    SchemaNodeHandle retval =
+        make_shared<SchemaNode>(path, dd, (FieldDescriptor *) NULL,
+                                0, 0, dotrace);
     
     for (int ndx = 0; ndx < dd->field_count(); ++ndx) {
         FieldDescriptor const * fd = dd->field(ndx);
@@ -142,14 +146,14 @@ traverse_root(StringSeq & path, Descriptor const * dd, bool dotrace)
         switch (fd->cpp_type()) {
         case FieldDescriptor::CPPTYPE_MESSAGE:
             {
-                SchemaNode * child =
+                SchemaNodeHandle child =
                     traverse_group(path, fd, 0, 0, dotrace);
                 retval->add_child(child);
             }
             break;
         default:
             {
-                SchemaNode * child =
+                SchemaNodeHandle child =
                     traverse_leaf(path, fd, 0, 0, dotrace);
                 retval->add_child(child);
             }
@@ -158,7 +162,7 @@ traverse_root(StringSeq & path, Descriptor const * dd, bool dotrace)
         path.pop_back();
     }
 
-    return retval;
+    return move(retval);
 }
 
 class MyErrorCollector : public MultiFileErrorCollector
@@ -292,7 +296,7 @@ SchemaNode::SchemaNode(StringSeq const & i_path,
 }
 
 void
-SchemaNode::add_child(SchemaNode * i_child)
+SchemaNode::add_child(SchemaNodeHandle const & i_child)
 {
     m_children.push_back(i_child);
     m_pqcol->add_child(i_child->m_pqcol);
@@ -305,7 +309,7 @@ SchemaNode::traverse(NodeTraverser & nt)
     for (SchemaNodeSeq::iterator it = m_children.begin();
          it != m_children.end();
          ++it) {
-        SchemaNode * np = *it;
+        SchemaNodeHandle const & np = *it;
         np->traverse(nt);
     }
 }
@@ -320,7 +324,7 @@ SchemaNode::propagate_message(Message const * i_msg,
     for (SchemaNodeSeq::iterator it = m_children.begin();
          it != m_children.end();
          ++it) {
-        SchemaNode * np = *it;
+        SchemaNodeHandle const & np = *it;
         np->propagate_field(reflp, i_msg, replvl, deflvl);
     }
 }
@@ -526,6 +530,7 @@ Schema::Schema(string const & i_protodir,
                string const & i_protofile,
                string const & i_rootmsg,
                string const & i_outfile,
+               size_t i_rowgrpsz,
                bool i_dotrace)
     : m_dotrace(i_dotrace)
 {
@@ -546,10 +551,10 @@ Schema::Schema(string const & i_protodir,
 
     unlink(i_outfile.c_str());
 
-    m_output.reset(new ParquetFile(i_outfile));
+    m_output.reset(new ParquetFile(i_outfile, i_rowgrpsz));
 
     StringSeq path = { m_typep->full_name() };
-    m_root.reset(traverse_root(path, m_typep, m_dotrace));
+    m_root = traverse_root(path, m_typep, m_dotrace);
 
     m_output->set_root(m_root->column());
 }

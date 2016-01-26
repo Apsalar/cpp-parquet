@@ -20,8 +20,9 @@ namespace parquet_file2 {
 
 char const * PARQUET_MAGIC = "PAR1";
 
-ParquetFile::ParquetFile(string const & i_path)
+ParquetFile::ParquetFile(string const & i_path, size_t i_rowgrpsz)
     : m_path(i_path)
+    , m_rowgrpsz(i_rowgrpsz)
     , m_num_rows(0)
 {
     m_fd = open(i_path.c_str(), O_RDWR | O_CREAT | O_EXCL, 0700);
@@ -101,7 +102,7 @@ ParquetFile::check_rowgrp_size()
     sizer(m_root);
     m_root->traverse(sizer);
 
-    if (sizer.m_rowgrp_size >= ROW_GROUP_SIZE)
+    if (sizer.m_rowgrp_size >= m_rowgrpsz)
         flush_row_group();
 }
 

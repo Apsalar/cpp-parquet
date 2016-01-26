@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
   }
   google::InitGoogleLogging(argv[0]);
 
-  ParquetFile output(argv[1]);
+  ParquetFile output(argv[1], 256);
   int NN = stoi(argv[2], NULL, 0);
 
   ParquetColumnHandle ch0
