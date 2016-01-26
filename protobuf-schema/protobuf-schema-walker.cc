@@ -8,6 +8,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -544,10 +545,11 @@ Schema::Schema(string const & i_protodir,
     m_proto = m_dmsgfact.GetPrototype(m_typep);
 
     unlink(i_outfile.c_str());
-    m_output = new ParquetFile(i_outfile);
+
+    m_output.reset(new ParquetFile(i_outfile));
 
     StringSeq path = { m_typep->full_name() };
-    m_root = traverse_root(path, m_typep, m_dotrace);
+    m_root.reset(traverse_root(path, m_typep, m_dotrace));
 
     m_output->set_root(m_root->column());
 }
@@ -623,7 +625,8 @@ Schema::process_record(istream & istrm, size_t recnum)
     if (!istrm.good())
         return false;
 
-    Message * inmsg = m_proto->New();
+    unique_ptr<Message> inmsg(m_proto->New());
+
     inmsg->ParseFromString(buffer);
 
     if (m_dotrace)
@@ -631,8 +634,8 @@ Schema::process_record(istream & istrm, size_t recnum)
              << endl
              << inmsg->DebugString() << endl;
     
-    m_root->propagate_message(inmsg, 0, 0);
-    
+    m_root->propagate_message(inmsg.get(), 0, 0);
+
     return true;
 }
 

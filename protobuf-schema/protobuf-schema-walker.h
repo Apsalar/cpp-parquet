@@ -101,9 +101,9 @@ private:
     google::protobuf::DynamicMessageFactory     m_dmsgfact;
     google::protobuf::Message const *           m_proto;
 
-    parquet_file2::ParquetFile * m_output;
+    std::unique_ptr<parquet_file2::ParquetFile> m_output;
 
-    SchemaNode * m_root;
+    std::unique_ptr<SchemaNode> m_root;
     bool m_dotrace;
 };
 

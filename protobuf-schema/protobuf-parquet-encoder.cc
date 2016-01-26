@@ -40,7 +40,7 @@ bool g_dotrace = false;
 void
 usage(int & argc, char ** & argv)
 {
-    cerr << "usage: " << argv[0] << " [options] -p <protofile> -m <rootmsg> [-i <infile>]" << endl
+    cerr << "usage: " << argv[0] << " [options] -p <protofile> -m <rootmsg> -o <outfile> [-i <infile>]" << endl
          << "  options:" << endl
          << "    -h, --help            display usage" << endl
          << "    -d, --protodir=DIR    protobuf src dir    [" << DEF_PROTODIR << "]" << endl
