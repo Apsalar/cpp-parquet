@@ -98,8 +98,9 @@ private:
     bool process_record(std::istream & istrm, size_t recnum);
     
     google::protobuf::compiler::DiskSourceTree  m_srctree;
-    google::protobuf::compiler::MultiFileErrorCollector * m_errcollp;
-    google::protobuf::compiler::Importer *      m_importerp;
+    std::unique_ptr<google::protobuf::compiler::MultiFileErrorCollector>
+    	                                        		m_errcollp;
+    std::unique_ptr<google::protobuf::compiler::Importer> m_importerp;
     google::protobuf::Descriptor const *        m_typep;
     google::protobuf::DynamicMessageFactory     m_dmsgfact;
     google::protobuf::Message const *           m_proto;

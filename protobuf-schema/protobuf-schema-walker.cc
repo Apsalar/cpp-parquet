@@ -535,8 +535,8 @@ Schema::Schema(string const & i_protodir,
     : m_dotrace(i_dotrace)
 {
     m_srctree.MapPath("", i_protodir);
-    m_errcollp = new MyErrorCollector();
-    m_importerp = new Importer(&m_srctree, m_errcollp);
+    m_errcollp.reset(new MyErrorCollector());
+    m_importerp.reset(new Importer(&m_srctree, m_errcollp.get()));
     FileDescriptor const * fdp = m_importerp->Import(i_protofile);
     if (!fdp) {
         LOG(FATAL) << "trouble opening proto file " << i_protofile
