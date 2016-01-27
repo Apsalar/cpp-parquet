@@ -101,7 +101,7 @@ private:
 
     void add_levels(size_t i_size, int i_replvl, int i_deflvl);
 
-    void push_page();
+    void finalize_page();
     
     void concatenate_page_data(OctetSeq & buffer);
 

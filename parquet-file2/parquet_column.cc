@@ -188,7 +188,7 @@ ParquetColumn::flush_row_group(int fd, TCompactProtocol * protocol)
 {
     // If there are no pages or any remaining data push a page.
     if (m_num_page_values)
-        push_page();
+        finalize_page();
 
     m_column_write_offset = lseek(fd, 0, SEEK_CUR);
 
@@ -255,7 +255,7 @@ ParquetColumn::add_levels(size_t i_size, int i_replvl, int i_deflvl)
     if (m_data.size() + i_size > PAGE_SIZE ||
         m_rep_enc.IsFull() ||
         m_def_enc.IsFull())
-        push_page();
+        finalize_page();
 
     if (m_maxreplvl > 0)
         m_rep_enc.Put(i_replvl);
@@ -270,7 +270,7 @@ ParquetColumn::add_levels(size_t i_size, int i_replvl, int i_deflvl)
 }
 
 void
-ParquetColumn::push_page()
+ParquetColumn::finalize_page()
 {
     DataPageHandle dph = make_shared<DataPage>();
 
