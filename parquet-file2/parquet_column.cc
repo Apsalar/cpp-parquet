@@ -5,9 +5,6 @@
 // All rights reserved.
 //
 
-#include <snappy.h>
-#include <zlib.h>
-
 #include "parquet_types.h"
 
 #include "parquet-file/util/bit-util.h"
@@ -36,8 +33,11 @@ ParquetColumn::ParquetColumn(StringSeq const & i_path,
     , m_maxreplvl(i_maxreplvl)
     , m_maxdeflvl(i_maxdeflvl)
     , m_repetition_type(i_repetition_type)
+    , m_original_encoding(i_encoding)
     , m_encoding(i_encoding)
+    , m_encodings({i_encoding})
     , m_compression_codec(i_compression_codec)
+    , m_compressor(i_compression_codec)
     , m_num_page_values(0)
     , m_rep_enc(m_rep_buf, sizeof(m_rep_buf),
                 impala::BitUtil::Log2(i_maxreplvl + 1))
@@ -60,34 +60,56 @@ ParquetColumn::add_child(ParquetColumnHandle const & ch)
 }
 
 void
-ParquetColumn::add_fixed_datum(void const * i_ptr,
-                               size_t i_size,
-                               int i_replvl,
-                               int i_deflvl)
+ParquetColumn::add_datum(void const * i_ptr,
+                         size_t i_size,
+                         bool i_isvarlen,
+                         int i_replvl,
+                         int i_deflvl)
 {
-    add_levels(i_size, i_replvl, i_deflvl);
-    
-    if (i_ptr)
-        m_data.insert(m_data.end(),
-                      static_cast<uint8_t const *>(i_ptr),
-                      static_cast<uint8_t const *>(i_ptr) + i_size);
-}
+    // Dictionary encoding, if applicable.
+    uint32_t enc_buf;
+    void const * enc_ptr;
+    size_t enc_size;
+    if (i_ptr) {
+        switch (m_encoding) {
+        case Encoding::PLAIN:
+            enc_ptr = i_ptr;
+            enc_size = i_size;
+            break;
+        case Encoding::PLAIN_DICTIONARY:
+            try {
+                enc_buf = m_dict_enc.encode_datum(i_ptr, i_size, i_isvarlen);
+                enc_ptr = (void const *) &enc_buf;
+                enc_size = sizeof(enc_buf);
+            }
+            catch (overflow_error const & ex) {
+                // We've overflowed the dictionary, switch to plain.
+                finalize_page();
+                m_encoding = Encoding::PLAIN;
+                m_encodings.push_back(Encoding::PLAIN);
+                enc_ptr = i_ptr;
+                enc_size = i_size;
+            }
+            break;
+        default:
+            LOG(FATAL) << "unsupported encoding: " << int(m_encoding);
+            break;
+        }
+    }
 
-void
-ParquetColumn::add_varlen_datum(void const * i_ptr,
-                                size_t i_size,
-                                int i_replvl,
-                                int i_deflvl)
-{
-    add_levels(i_size, i_replvl, i_deflvl);
+    check_full(enc_size);
+
+    add_levels(i_replvl, i_deflvl);
     
     if (i_ptr) {
-        uint32_t len = i_size;
-        uint8_t * lenptr = (uint8_t *) &len;
-        m_data.insert(m_data.end(), lenptr, lenptr + sizeof(len));
+        if (m_encoding == Encoding::PLAIN && i_isvarlen) {
+            uint32_t len = enc_size;
+            uint8_t * lenptr = (uint8_t *) &len;
+            m_data.insert(m_data.end(), lenptr, lenptr + sizeof(len));
+        }
         m_data.insert(m_data.end(),
-                      static_cast<uint8_t const *>(i_ptr),
-                      static_cast<uint8_t const *>(i_ptr) + i_size);
+                      static_cast<uint8_t const *>(enc_ptr),
+                      static_cast<uint8_t const *>(enc_ptr) + enc_size);
     }
 }
 
@@ -96,8 +118,10 @@ ParquetColumn::add_boolean_datum(bool i_val,
                                  int i_replvl,
                                  int i_deflvl)
 {
-    add_levels(1, i_replvl, i_deflvl);
+    check_full(1);
 
+    add_levels(i_replvl, i_deflvl);
+    
     if (i_val)
         m_bool_buf |= (1 << m_bool_cnt);
     ++m_bool_cnt;
@@ -186,12 +210,43 @@ ParquetColumn::traverse(Traverser & tt)
 ColumnMetaData
 ParquetColumn::flush_row_group(int fd, TCompactProtocol * protocol)
 {
-    // If there are no pages or any remaining data push a page.
+    // Finialize any remaining data.
     if (m_num_page_values)
         finalize_page();
 
     m_column_write_offset = lseek(fd, 0, SEEK_CUR);
 
+    if (m_original_encoding == Encoding::PLAIN_DICTIONARY) {
+        m_concat_buffer.assign(m_dict_enc.m_data.begin(),
+                               m_dict_enc.m_data.end());
+        OctetSeq out;
+        m_compressor.compress(m_concat_buffer, out);
+        
+        DictionaryPageHeader dph;
+        dph.__set_num_values(m_dict_enc.m_nvals);
+
+        PageHeader ph;
+        ph.__set_type(PageType::DICTIONARY_PAGE);
+        ph.__set_uncompressed_page_size(m_dict_enc.m_data.size());
+        ph.__set_compressed_page_size(out.size());
+        ph.__set_dictionary_page_header(dph);
+
+        size_t header_size = ph.write(protocol);
+        m_uncompressed_size += header_size;
+        m_compressed_size += header_size;
+
+        ssize_t rv = write(fd, out.data(), out.size());
+        if (rv < 0) {
+            LOG(FATAL) << "flush dict: write failed: " << strerror(errno);
+        }
+        else if (rv != out.size()) {
+            LOG(FATAL) << "flush: unexpected write size:"
+                       << " expecting " << out.size() << ", saw " << rv;
+        }
+        m_uncompressed_size += m_dict_enc.m_data.size();
+        m_compressed_size += out.size();
+    }
+    
     for (DataPageHandle dph : m_pages) {
         size_t header_size = dph->flush(fd, protocol);
         m_uncompressed_size += header_size;
@@ -203,7 +258,7 @@ ParquetColumn::flush_row_group(int fd, TCompactProtocol * protocol)
     
     ColumnMetaData column_metadata;
     column_metadata.__set_type(m_data_type);
-    column_metadata.__set_encodings({m_encoding});
+    column_metadata.__set_encodings(m_encodings);
     column_metadata.__set_codec(m_compression_codec);
     column_metadata.__set_num_values(m_num_rowgrp_values);
     column_metadata.__set_total_uncompressed_size(m_uncompressed_size);
@@ -250,13 +305,17 @@ ParquetColumn::DataPage::flush(int fd, TCompactProtocol * protocol)
 }
 
 void
-ParquetColumn::add_levels(size_t i_size, int i_replvl, int i_deflvl)
+ParquetColumn::check_full(size_t i_size)
 {
     if (m_data.size() + i_size > PAGE_SIZE ||
         m_rep_enc.IsFull() ||
         m_def_enc.IsFull())
         finalize_page();
+}
 
+void
+ParquetColumn::add_levels(int i_replvl, int i_deflvl)
+{
     if (m_maxreplvl > 0)
         m_rep_enc.Put(i_replvl);
 
@@ -297,73 +356,14 @@ ParquetColumn::finalize_page()
 
     OctetSeq & out = dph->m_page_data;
     
-    if (m_compression_codec == CompressionCodec::UNCOMPRESSED) {
-        out.reserve(uncompressed_page_size);
-        concatenate_page_data(out);
-        compressed_page_size = uncompressed_page_size;
-    }
-    else if (m_compression_codec == CompressionCodec::SNAPPY) {
-        // NOTE - I don't see how to run snappy in partial increments,
-        // so I think we are forced to pre-concatenate the input into a
-        // single buffer prior to compression.
-        //
-        m_concat_buffer.reserve(uncompressed_page_size);
-        concatenate_page_data(m_concat_buffer);
-        OctetSeq tmp(snappy::MaxCompressedLength(uncompressed_page_size));
-        snappy::RawCompress((char const *) m_concat_buffer.data(),
-                            m_concat_buffer.size(),
-                            (char *) tmp.data(),
-                            &compressed_page_size);
-        tmp.resize(compressed_page_size);
-        out.assign(tmp.begin(), tmp.end());
-    }
-    else if (m_compression_codec == CompressionCodec::GZIP) {
-        // FIXME - this routine can be improved by running the
-        // compressor over the three input "batches".  For simplicity
-        // we concatenate all the input batches together and compress
-        // in one swoop.
-        //
-        m_concat_buffer.reserve(uncompressed_page_size);
-        concatenate_page_data(m_concat_buffer);
-
-        int window_bits = 15 + 16; // maximum window + GZIP
-        z_stream stream;
-        memset(&stream, '\0', sizeof(stream));
-        int rv = deflateInit2(&stream,
-                              Z_DEFAULT_COMPRESSION,
-                              Z_DEFLATED,
-                              window_bits,
-                              9,
-                              Z_DEFAULT_STRATEGY);
-        if (rv != Z_OK) {
-            LOG(FATAL) << "deflateInit2 failed: " << rv;
-        }
-        size_t maxsz = deflateBound(&stream, uncompressed_page_size);
-        OctetSeq tmp(maxsz);
-        stream.next_in =
-            const_cast<Bytef*>
-            (reinterpret_cast<const Bytef*>
-             (m_concat_buffer.data()));
-        stream.avail_in = m_concat_buffer.size();
-        stream.next_out = reinterpret_cast<Bytef*>(tmp.data());
-        stream.avail_out = tmp.size();
-        rv = deflate(&stream, Z_FINISH);
-        if (rv != Z_STREAM_END) {
-            LOG(FATAL) << "gzip deflate failed: " << rv;
-        }
-
-        out.assign(tmp.begin(), tmp.begin() + stream.total_out);
-        compressed_page_size = stream.total_out;
-        deflateEnd(&stream);
-    }
-    else {
-        LOG(FATAL) << "unsupported compression codec: "
-                   << int(m_compression_codec);
-    }
+    m_concat_buffer.reserve(uncompressed_page_size);
+    concatenate_page_data(m_concat_buffer);
+    m_compressor.compress(m_concat_buffer, out);
+    compressed_page_size = out.size();
 
     DataPageHeader data_header;
     data_header.__set_num_values(m_num_page_values);
-    data_header.__set_encoding(Encoding::PLAIN);
+    data_header.__set_encoding(m_encoding);
     // NB: For some reason, the following two must be set, even though
     // they can default to PLAIN, even for required/nonrepeating fields.
     // I'm not sure if it's part of the Parquet spec or a bug in
@@ -420,12 +420,15 @@ ParquetColumn::reset_row_group_state()
 {
     reset_page_state();
 
+    m_encoding = m_original_encoding;
+    
     m_pages.clear();
     m_num_rowgrp_recs = 0L;
     m_num_rowgrp_values = 0L;
     m_column_write_offset = -1L;
     m_uncompressed_size = 0L;
     m_compressed_size = 0L;
+    m_dict_enc.clear();
 }
 
 } // end namespace parquet_file2

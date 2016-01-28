@@ -20,12 +20,14 @@
 
 #include "parquet_types.h"
 
+#include "compressor.h"
+#include "dictionary_encoder.h"
+
 namespace parquet_file2 {
 
 typedef std::vector<std::string> StringSeq;
 typedef std::vector<uint8_t> OctetSeq;
 typedef std::deque<uint8_t> OctetBuffer;
-
 
 class ParquetColumn;
 typedef std::shared_ptr<ParquetColumn> ParquetColumnHandle;
@@ -45,14 +47,10 @@ public:
 
     void add_child(ParquetColumnHandle const & ch);
 
-    void add_fixed_datum(void const * i_ptr, size_t i_size,
-                         int i_replvl, int i_deflvl);
+    void add_datum(void const * i_ptr, size_t i_size, bool i_isvarlen,
+                   int i_replvl, int i_deflvl);
 
-    void add_varlen_datum(void const * i_ptr, size_t i_size,
-                          int i_replvl, int i_deflvl);
-
-    void add_boolean_datum(bool i_val,
-                           int i_replvl, int i_deflvl);
+    void add_boolean_datum(bool i_val, int i_replvl, int i_deflvl);
 
     std::string name() const;
 
@@ -99,7 +97,9 @@ private:
     typedef std::shared_ptr<DataPage> DataPageHandle;
     typedef std::deque<DataPageHandle> DataPageSeq;
 
-    void add_levels(size_t i_size, int i_replvl, int i_deflvl);
+    void check_full(size_t i_size);
+    
+    void add_levels(int i_replvl, int i_deflvl);
 
     void finalize_page();
     
@@ -115,16 +115,20 @@ private:
     parquet::Type::type m_data_type;
     parquet::ConvertedType::type m_converted_type;
     parquet::FieldRepetitionType::type m_repetition_type;
+    parquet::Encoding::type m_original_encoding;
     parquet::Encoding::type m_encoding;
+    std::vector<parquet::Encoding::type> m_encodings;
     parquet::CompressionCodec::type m_compression_codec;
 
+    Compressor m_compressor;
+    
     ParquetColumnSeq m_children;
 
     // Page accumulation
     OctetBuffer m_data;
     size_t m_num_page_values;
-    impala::RleEncoder m_rep_enc;
-    impala::RleEncoder m_def_enc;
+    impala::RleEncoder m_rep_enc;	// Repetition Level
+    impala::RleEncoder m_def_enc;	// Definition Level
     uint8_t m_rep_buf[PAGE_SIZE];
     uint8_t m_def_buf[PAGE_SIZE];
     OctetSeq m_concat_buffer;
@@ -138,6 +142,7 @@ private:
     off_t m_column_write_offset;
     size_t m_uncompressed_size;
     size_t m_compressed_size;
+    DictionaryEncoder m_dict_enc;
 };
 
 } // end namespace parquet_file2

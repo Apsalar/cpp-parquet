@@ -1,7 +1,7 @@
 #
 # Build CMakeFile for cpp-parquet
 
-ADD_LIBRARY(libcppparquet2 parquet_file.cc parquet_column.cc)
+ADD_LIBRARY(libcppparquet2 parquet_file.cc parquet_column.cc dictionary_encoder.cc compressor.cc)
 
 ADD_CUSTOM_COMMAND(
    OUTPUT ${SOURCE_DIR}/src/gtest-all.cc
