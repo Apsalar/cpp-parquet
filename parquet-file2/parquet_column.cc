@@ -68,28 +68,23 @@ ParquetColumn::add_datum(void const * i_ptr,
                          int i_deflvl)
 {
     // Dictionary encoding, if applicable.
-    uint32_t enc_buf;
-    void const * enc_ptr;
-    size_t enc_size;
+    uint32_t enc_val;
+    size_t check_size;
     if (i_ptr) {
         switch (m_encoding) {
         case Encoding::PLAIN:
-            enc_ptr = i_ptr;
-            enc_size = i_size;
+            check_size = i_size;
             break;
         case Encoding::PLAIN_DICTIONARY:
             try {
-                enc_buf = m_dict_enc.encode_datum(i_ptr, i_size, i_isvarlen);
-                enc_ptr = (void const *) &enc_buf;
-                enc_size = sizeof(enc_buf);
+                enc_val = m_dict_enc.encode_datum(i_ptr, i_size, i_isvarlen);
+                check_size = 0; // We don't use conventional buffer space.
             }
             catch (overflow_error const & ex) {
-                // We've overflowed the dictionary, switch to plain.
+                // We've overflowed the dictionary, fallback to PLAIN.
                 finalize_page();
                 m_encoding = Encoding::PLAIN;
                 m_encodings.push_back(Encoding::PLAIN);
-                enc_ptr = i_ptr;
-                enc_size = i_size;
             }
             break;
         default:
@@ -98,7 +93,7 @@ ParquetColumn::add_datum(void const * i_ptr,
         }
     }
 
-    check_full(enc_size);
+    check_full(check_size);
 
     add_levels(i_replvl, i_deflvl);
     
@@ -106,16 +101,16 @@ ParquetColumn::add_datum(void const * i_ptr,
         switch (m_encoding) {
         case Encoding::PLAIN:
             if (i_isvarlen) {
-                uint32_t len = enc_size;
+                uint32_t len = i_size;
                 uint8_t * lenptr = (uint8_t *) &len;
                 m_data.insert(m_data.end(), lenptr, lenptr + sizeof(len));
             }
             m_data.insert(m_data.end(),
-                          static_cast<uint8_t const *>(enc_ptr),
-                          static_cast<uint8_t const *>(enc_ptr) + enc_size);
+                          static_cast<uint8_t const *>(i_ptr),
+                          static_cast<uint8_t const *>(i_ptr) + i_size);
             break;
         case Encoding::PLAIN_DICTIONARY:
-            m_val_enc.Put(enc_buf);
+            m_val_enc.Put(enc_val);
             break;
         default:
             LOG(FATAL) << "unsupported encoding: " << int(m_encoding);
@@ -360,8 +355,6 @@ ParquetColumn::finalize_page()
     }
 
     size_t uncompressed_page_size;
-    size_t compressed_page_size;
-
     switch (m_encoding) {
     case Encoding::PLAIN:
         uncompressed_page_size =
@@ -387,7 +380,7 @@ ParquetColumn::finalize_page()
     m_concat_buffer.reserve(uncompressed_page_size);
     concatenate_page_data(m_concat_buffer);
     m_compressor.compress(m_concat_buffer, out);
-    compressed_page_size = out.size();
+    size_t compressed_page_size = out.size();
 
     DataPageHeader data_header;
     data_header.__set_num_values(m_num_page_values);
@@ -464,6 +457,8 @@ ParquetColumn::reset_row_group_state()
     reset_page_state();
 
     m_encoding = m_original_encoding;
+    m_encodings.clear();
+    m_encodings.push_back(m_original_encoding);
     
     m_pages.clear();
     m_num_rowgrp_recs = 0L;

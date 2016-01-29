@@ -221,7 +221,8 @@ SchemaNode::SchemaNode(StringSeq const & i_path,
         parquet::Type::type data_type;
         parquet::ConvertedType::type converted_type =
             parquet::ConvertedType::type(-1);
-        Encoding::type encoding = Encoding::PLAIN_DICTIONARY;
+        // Encoding::type encoding = Encoding::PLAIN_DICTIONARY;
+        Encoding::type encoding = Encoding::PLAIN;
 
         switch (m_fdp->type()) {
         case FieldDescriptor::TYPE_DOUBLE:
