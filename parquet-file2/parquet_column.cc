@@ -43,6 +43,7 @@ ParquetColumn::ParquetColumn(StringSeq const & i_path,
                 impala::BitUtil::Log2(i_maxreplvl + 1))
     , m_def_enc(m_def_buf, sizeof(m_def_buf),
                 impala::BitUtil::Log2(i_maxdeflvl + 1))
+    , m_val_enc(m_val_buf, sizeof(m_val_buf), 16)
     , m_bool_buf(0)
     , m_bool_cnt(0)
     , m_num_rowgrp_recs(0)
@@ -102,14 +103,24 @@ ParquetColumn::add_datum(void const * i_ptr,
     add_levels(i_replvl, i_deflvl);
     
     if (i_ptr) {
-        if (m_encoding == Encoding::PLAIN && i_isvarlen) {
-            uint32_t len = enc_size;
-            uint8_t * lenptr = (uint8_t *) &len;
-            m_data.insert(m_data.end(), lenptr, lenptr + sizeof(len));
+        switch (m_encoding) {
+        case Encoding::PLAIN:
+            if (i_isvarlen) {
+                uint32_t len = enc_size;
+                uint8_t * lenptr = (uint8_t *) &len;
+                m_data.insert(m_data.end(), lenptr, lenptr + sizeof(len));
+            }
+            m_data.insert(m_data.end(),
+                          static_cast<uint8_t const *>(enc_ptr),
+                          static_cast<uint8_t const *>(enc_ptr) + enc_size);
+            break;
+        case Encoding::PLAIN_DICTIONARY:
+            m_val_enc.Put(enc_buf);
+            break;
+        default:
+            LOG(FATAL) << "unsupported encoding: " << int(m_encoding);
+            break;
         }
-        m_data.insert(m_data.end(),
-                      static_cast<uint8_t const *>(enc_ptr),
-                      static_cast<uint8_t const *>(enc_ptr) + enc_size);
     }
 }
 
@@ -248,6 +259,8 @@ ParquetColumn::flush_row_group(int fd, TCompactProtocol * protocol)
     }
     
     for (DataPageHandle dph : m_pages) {
+        // The m_uncompressed_page_size and m_compressed_size
+        // were updated during in finalize_page ...
         size_t header_size = dph->flush(fd, protocol);
         m_uncompressed_size += header_size;
         m_compressed_size += header_size;
@@ -309,7 +322,8 @@ ParquetColumn::check_full(size_t i_size)
 {
     if (m_data.size() + i_size > PAGE_SIZE ||
         m_rep_enc.IsFull() ||
-        m_def_enc.IsFull())
+        m_def_enc.IsFull() ||
+        m_val_enc.IsFull())
         finalize_page();
 }
 
@@ -335,6 +349,7 @@ ParquetColumn::finalize_page()
 
     m_rep_enc.Flush();
     m_def_enc.Flush();
+    m_val_enc.Flush();
 
     if (m_bool_cnt) {
         m_data.insert(m_data.end(),
@@ -344,10 +359,23 @@ ParquetColumn::finalize_page()
         m_bool_cnt = 0;
     }
 
-    size_t uncompressed_page_size =
-        m_data.size() + m_rep_enc.len() + m_def_enc.len();
-
+    size_t uncompressed_page_size;
     size_t compressed_page_size;
+
+    switch (m_encoding) {
+    case Encoding::PLAIN:
+        uncompressed_page_size =
+            m_rep_enc.len() + m_def_enc.len() + m_data.size();
+        break;
+    case Encoding::PLAIN_DICTIONARY:
+        uncompressed_page_size =
+            // RLE(replvl) + RLE(deflvl) + bitwidth + RLE(encoded-values)
+            m_rep_enc.len() + m_def_enc.len() + 1 + 4 + m_val_enc.len();
+        break;
+    default:
+        LOG(FATAL) << "unsupported encoding: " << int(m_encoding);
+        break;
+    }
     
     if (m_rep_enc.len())
         uncompressed_page_size += 4;
@@ -389,6 +417,7 @@ ParquetColumn::concatenate_page_data(OctetSeq & buf)
 {
     buf.clear();		// Doesn't release memory
 
+    uint8_t bitwidth = 16;
     uint32_t len;
     uint8_t * lenptr = (uint8_t *) &len;
     len = m_rep_enc.len();
@@ -401,7 +430,20 @@ ParquetColumn::concatenate_page_data(OctetSeq & buf)
         buf.insert(buf.end(), lenptr, lenptr + sizeof(len));
         buf.insert(buf.end(), m_def_buf, m_def_buf + len);
     }
-    buf.insert(buf.end(), m_data.begin(), m_data.end());
+    switch (m_encoding) {
+    case Encoding::PLAIN:
+        buf.insert(buf.end(), m_data.begin(), m_data.end());
+        break;
+    case Encoding::PLAIN_DICTIONARY:
+        buf.insert(buf.end(), &bitwidth, &bitwidth + 1);
+        len = m_val_enc.len();
+        buf.insert(buf.end(), lenptr, lenptr + sizeof(len));
+        buf.insert(buf.end(), m_val_buf, m_val_buf + len);
+        break;
+    default:
+        LOG(FATAL) << "unsupported encoding: " << int(m_encoding);
+        break;
+    }
 }
 
 void
@@ -411,6 +453,7 @@ ParquetColumn::reset_page_state()
     m_num_page_values = 0;
     m_rep_enc.Clear();
     m_def_enc.Clear();
+    m_val_enc.Clear();
     m_bool_buf = 0;
     m_bool_cnt = 0;
 }

@@ -129,8 +129,10 @@ private:
     size_t m_num_page_values;
     impala::RleEncoder m_rep_enc;	// Repetition Level
     impala::RleEncoder m_def_enc;	// Definition Level
+    impala::RleEncoder m_val_enc;	// Dictionary Encoded Values
     uint8_t m_rep_buf[PAGE_SIZE];
     uint8_t m_def_buf[PAGE_SIZE];
+    uint8_t m_val_buf[PAGE_SIZE];
     OctetSeq m_concat_buffer;
     uint8_t m_bool_buf;
     int m_bool_cnt;
