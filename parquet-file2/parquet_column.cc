@@ -69,7 +69,7 @@ ParquetColumn::add_datum(void const * i_ptr,
 {
     // Dictionary encoding, if applicable.
     uint32_t enc_val;
-    size_t check_size;
+    size_t check_size = 0;
     if (i_ptr) {
         switch (m_encoding) {
         case Encoding::PLAIN:
@@ -223,6 +223,8 @@ ParquetColumn::flush_row_group(int fd, TCompactProtocol * protocol)
     m_column_write_offset = lseek(fd, 0, SEEK_CUR);
 
     if (m_original_encoding == Encoding::PLAIN_DICTIONARY) {
+        size_t dictsz = m_dict_enc.m_data.size();
+
         m_concat_buffer.assign(m_dict_enc.m_data.begin(),
                                m_dict_enc.m_data.end());
         OctetSeq out;
@@ -233,7 +235,7 @@ ParquetColumn::flush_row_group(int fd, TCompactProtocol * protocol)
 
         PageHeader ph;
         ph.__set_type(PageType::DICTIONARY_PAGE);
-        ph.__set_uncompressed_page_size(m_dict_enc.m_data.size());
+        ph.__set_uncompressed_page_size(dictsz);
         ph.__set_compressed_page_size(out.size());
         ph.__set_dictionary_page_header(dph);
 
@@ -249,21 +251,32 @@ ParquetColumn::flush_row_group(int fd, TCompactProtocol * protocol)
             LOG(FATAL) << "flush: unexpected write size:"
                        << " expecting " << out.size() << ", saw " << rv;
         }
-        m_uncompressed_size += m_dict_enc.m_data.size();
+        m_uncompressed_size += dictsz;
         m_compressed_size += out.size();
+
+        VLOG(2) << path_string()
+                << " dictionary page header_size " + header_size
+                << " data_size " + dictsz;
     }
     
+    size_t pgndx = 0;
     for (DataPageHandle dph : m_pages) {
         // The m_uncompressed_page_size and m_compressed_size
         // were updated during in finalize_page ...
         size_t header_size = dph->flush(fd, protocol);
+        VLOG(2) << path_string()
+                << " pg " << pgndx << " header_size " << header_size;
         m_uncompressed_size += header_size;
         m_compressed_size += header_size;
+        ++pgndx;
     }
 
     // We don't want the top-level name in the path here.
     StringSeq topless(m_path.begin() + 1, m_path.end());
     
+    VLOG(2) << path_string()
+            << " total_uncompressed_size " << m_uncompressed_size;
+
     ColumnMetaData column_metadata;
     column_metadata.__set_type(m_data_type);
     column_metadata.__set_encodings(m_encodings);
@@ -340,6 +353,8 @@ ParquetColumn::add_levels(int i_replvl, int i_deflvl)
 void
 ParquetColumn::finalize_page()
 {
+    size_t pgndx = m_pages.size();
+
     DataPageHandle dph = make_shared<DataPage>();
 
     m_rep_enc.Flush();
@@ -369,11 +384,17 @@ ParquetColumn::finalize_page()
         LOG(FATAL) << "unsupported encoding: " << int(m_encoding);
         break;
     }
-    
+
     if (m_rep_enc.len())
         uncompressed_page_size += 4;
     if (m_def_enc.len())
         uncompressed_page_size += 4;
+
+    VLOG(2) << path_string()
+            << " pg " << pgndx
+            << " m_data.size() " << m_data.size()
+            << " m_rep_enc.len() " << m_rep_enc.len()
+            << " m_def_enc.len() " << m_def_enc.len();
 
     OctetSeq & out = dph->m_page_data;
     
@@ -397,6 +418,10 @@ ParquetColumn::finalize_page()
     dph->m_page_header.__set_compressed_page_size(compressed_page_size);
     dph->m_page_header.__set_data_page_header(data_header);
 
+    VLOG(2) << path_string()
+            << " pg " << pgndx
+            << " uncompressed_page_size " << uncompressed_page_size;
+    
     m_pages.push_back(dph);
     m_num_rowgrp_values += m_num_page_values;
     m_uncompressed_size += uncompressed_page_size;
