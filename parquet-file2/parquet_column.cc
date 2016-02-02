@@ -192,15 +192,22 @@ ParquetColumn::flush_row_group(int fd, TCompactProtocol * protocol)
 
     m_column_write_offset = lseek(fd, 0, SEEK_CUR);
 
+    size_t pgndx = 0;
     for (DataPageHandle dph : m_pages) {
         size_t header_size = dph->flush(fd, protocol);
+        VLOG(2) << path_string()
+                << " pg " << pgndx << " header_size " << header_size;
         m_uncompressed_size += header_size;
         m_compressed_size += header_size;
+        ++pgndx;
     }
 
     // We don't want the top-level name in the path here.
     StringSeq topless(m_path.begin() + 1, m_path.end());
     
+    VLOG(2) << path_string()
+            << " total_uncompressed_size " << m_uncompressed_size;
+
     ColumnMetaData column_metadata;
     column_metadata.__set_type(m_data_type);
     column_metadata.__set_encodings({m_encoding});
@@ -272,6 +279,8 @@ ParquetColumn::add_levels(size_t i_size, int i_replvl, int i_deflvl)
 void
 ParquetColumn::finalize_page()
 {
+    size_t pgndx = m_pages.size();
+
     DataPageHandle dph = make_shared<DataPage>();
 
     m_rep_enc.Flush();
@@ -288,12 +297,19 @@ ParquetColumn::finalize_page()
     size_t uncompressed_page_size =
         m_data.size() + m_rep_enc.len() + m_def_enc.len();
 
+
     size_t compressed_page_size;
     
     if (m_rep_enc.len())
         uncompressed_page_size += 4;
     if (m_def_enc.len())
         uncompressed_page_size += 4;
+
+    VLOG(2) << path_string()
+            << " pg " << pgndx
+            << " m_data.size() " << m_data.size()
+            << " m_rep_enc.len() " << m_rep_enc.len()
+            << " m_def_enc.len() " << m_def_enc.len();
 
     OctetSeq & out = dph->m_page_data;
     
@@ -376,6 +392,10 @@ ParquetColumn::finalize_page()
     dph->m_page_header.__set_compressed_page_size(compressed_page_size);
     dph->m_page_header.__set_data_page_header(data_header);
 
+    VLOG(2) << path_string()
+            << " pg " << pgndx
+            << " uncompressed_page_size " << uncompressed_page_size;
+    
     m_pages.push_back(dph);
     m_num_rowgrp_values += m_num_page_values;
     m_uncompressed_size += uncompressed_page_size;
