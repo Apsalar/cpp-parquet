@@ -53,6 +53,8 @@ private:
     size_t m_num_rows;
     
     std::vector<parquet::RowGroup> m_row_groups;
+
+    size_t m_nchecks;
 };
 
 } // end namespace parquet_file2

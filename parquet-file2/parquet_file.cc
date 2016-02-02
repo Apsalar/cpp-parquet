@@ -24,6 +24,7 @@ ParquetFile::ParquetFile(string const & i_path, size_t i_rowgrpsz)
     : m_path(i_path)
     , m_rowgrpsz(i_rowgrpsz)
     , m_num_rows(0)
+    , m_nchecks(0)
 {
     m_fd = open(i_path.c_str(), O_RDWR | O_CREAT | O_EXCL, 0700);
     
@@ -95,6 +96,10 @@ public:
 void
 ParquetFile::check_rowgrp_size()
 {
+    // Only check every Nth time we are called.
+    if (++m_nchecks % 100 != 0)
+        return;
+    
     // Check the aggregate row group size and flush if we are getting
     // too big.
 
