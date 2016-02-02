@@ -232,6 +232,7 @@ ParquetColumn::flush_row_group(int fd, TCompactProtocol * protocol)
         
         DictionaryPageHeader dph;
         dph.__set_num_values(m_dict_enc.m_nvals);
+        dph.__set_encoding(Encoding::PLAIN_DICTIONARY);
 
         PageHeader ph;
         ph.__set_type(PageType::DICTIONARY_PAGE);
@@ -378,7 +379,7 @@ ParquetColumn::finalize_page()
     case Encoding::PLAIN_DICTIONARY:
         uncompressed_page_size =
             // RLE(replvl) + RLE(deflvl) + bitwidth + RLE(encoded-values)
-            m_rep_enc.len() + m_def_enc.len() + 1 + 4 + m_val_enc.len();
+            m_rep_enc.len() + m_def_enc.len() + 1 + m_val_enc.len();
         break;
     default:
         LOG(FATAL) << "unsupported encoding: " << int(m_encoding);
@@ -455,7 +456,6 @@ ParquetColumn::concatenate_page_data(OctetSeq & buf)
     case Encoding::PLAIN_DICTIONARY:
         buf.insert(buf.end(), &bitwidth, &bitwidth + 1);
         len = m_val_enc.len();
-        buf.insert(buf.end(), lenptr, lenptr + sizeof(len));
         buf.insert(buf.end(), m_val_buf, m_val_buf + len);
         break;
     default:
