@@ -12,6 +12,7 @@
 #include <glog/logging.h>
 
 #include <google/protobuf/descriptor.h>
+#include <google/protobuf/stubs/common.h>
 
 #include "protobuf-schema-walker.h"
 
@@ -181,6 +182,8 @@ int run(int & argc, char ** & argv)
     if (!g_infile.empty()) {
         schema.convert(g_infile);
     }
+
+    ShutdownProtobufLibrary();
     
     return 0;
 }
