@@ -12,6 +12,7 @@ using namespace std;
 namespace parquet_file2 {
 
 DictionaryEncoder::DictionaryEncoder()
+    : m_nvals(0)
 {
 
 }
