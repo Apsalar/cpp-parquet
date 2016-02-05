@@ -16,7 +16,7 @@
 #ifndef IMPALA_BIT_UTIL_H
 #define IMPALA_BIT_UTIL_H
 
-#include <endian.h>
+// #include <endian.h>
 
 #include <boost/type_traits/make_unsigned.hpp>
 
