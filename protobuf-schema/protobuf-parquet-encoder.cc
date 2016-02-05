@@ -27,7 +27,7 @@ namespace {
 char const * DEF_PROTODIR = "./";
 char const * DEF_PROTOFILE = "";
 char const * DEF_ROOTMSG = "";
-char const * DEF_INFILE = "";
+char const * DEF_INFILE = "-";
 char const * DEF_OUTFILE = "";
 double const DEF_ROWGRPMB = 256.0;
 
@@ -154,7 +154,7 @@ parse_arguments(int & argc, char ** & argv)
         exit(1);
     }
 
-    if (!g_infile.empty() && g_outfile.empty()) {
+    if (g_outfile.empty()) {
         cerr << "missing outfile argument" << endl;
         usage(argc, argv);
         exit(1);
@@ -179,9 +179,7 @@ int run(int & argc, char ** & argv)
     if (g_dodump)
         schema.dump(cerr);
 
-    if (!g_infile.empty()) {
-        schema.convert(g_infile);
-    }
+    schema.convert(g_infile);
 
     ShutdownProtobufLibrary();
     
