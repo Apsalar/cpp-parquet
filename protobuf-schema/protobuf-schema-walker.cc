@@ -18,6 +18,7 @@
 #include "parquet_types.h"
 
 #include <google/protobuf/compiler/importer.h>
+#include <google/protobuf/descriptor.h>
 
 #include "protobuf-schema-walker.h"
 
@@ -30,6 +31,9 @@ using namespace parquet;
 using namespace parquet_file2;
 
 namespace {
+
+typedef vector<uint8_t> OctetSeq;
+typedef pair<uint8_t, OctetSeq> TLV;
 
 string
 pathstr(StringSeq const & path)
@@ -55,6 +59,29 @@ repstr(FieldDescriptor const * fd)
         return "RPT";
     else
         return "???";
+}
+
+TLV
+read_record(istream & istrm)
+{
+    uint8_t tag;
+    uint32_t len;
+    OctetSeq val;
+
+    if (!istrm.good())
+        return move(make_pair(0xff, val));
+    
+    istrm.read((char *) &tag, sizeof(tag));
+    istrm.read((char *) &len, sizeof(len));
+    val.resize(len);
+    istrm.read((char *) val.data(), len);
+
+    if (!istrm.good()) {
+        val.clear();
+        return move(make_pair(0xff, val));
+    }
+    
+    return move(make_pair(tag, val));
 }
 
 class FieldDumper : public NodeTraverser
@@ -529,22 +556,49 @@ SchemaNode::propagate_value(Reflection const * i_reflp,
 Schema::Schema(string const & i_protodir,
                string const & i_protofile,
                string const & i_rootmsg,
+               string const & i_infile,
                string const & i_outfile,
                size_t i_rowgrpsz,
                bool i_dotrace)
     : m_dotrace(i_dotrace)
+    , m_nrecs(0ULL)
 {
-    m_srctree.MapPath("", i_protodir);
-    m_errcollp.reset(new MyErrorCollector());
-    m_importerp.reset(new Importer(&m_srctree, m_errcollp.get()));
-    FileDescriptor const * fdp = m_importerp->Import(i_protofile);
-    if (!fdp) {
-        LOG(FATAL) << "trouble opening proto file " << i_protofile
-                   << " in directory " << i_protodir;
+    if (i_infile == "-") {
+        m_istrmp = &cin;
     }
-    m_typep = fdp->FindMessageTypeByName(i_rootmsg);
+    else {
+        m_ifstrm.open(i_infile.c_str(), ifstream::in | ifstream::binary);
+        if (!m_ifstrm.good()) {
+            LOG(FATAL) << "trouble opening input file: " << i_infile;
+        }
+        m_istrmp = &m_ifstrm;
+    }
+
+    m_poolp.reset(new DescriptorPool());
+
+    string rootmsg;
+    
+    // Is the proto description in the data file or specified explicitly?
+    FileDescriptor const * fdp;
+    if (i_protofile.empty()) {
+        fdp = process_header(*m_istrmp);
+        rootmsg = process_rootmsg(*m_istrmp);
+    }
+    else {
+        m_srctree.MapPath("", i_protodir);
+        m_errcollp.reset(new MyErrorCollector());
+        m_importerp.reset(new Importer(&m_srctree, m_errcollp.get()));
+        fdp = m_importerp->Import(i_protofile);
+        if (!fdp) {
+            LOG(FATAL) << "trouble opening proto file " << i_protofile
+                       << " in directory " << i_protodir;
+        }
+        rootmsg = i_rootmsg;
+    }
+
+    m_typep = fdp->FindMessageTypeByName(rootmsg);
     if (!m_typep) {
-        LOG(FATAL) << "couldn't find root message: " << i_rootmsg;
+        LOG(FATAL) << "couldn't find root message: " << rootmsg;
     }
 
     m_proto = m_dmsgfact.GetPrototype(m_typep);
@@ -568,33 +622,17 @@ Schema::dump(ostream & ostrm)
 }
 
 void
-Schema::convert(string const & infile)
+Schema::convert()
 {
-    ifstream ifstrm;
-    istream * istrmp;
-    if (infile == "-") {
-        istrmp = &cin;
-    }
-    else {
-        ifstrm.open(infile.c_str(), ifstream::in | ifstream::binary);
-        if (!ifstrm.good()) {
-            LOG(FATAL) << "trouble opening input file: " << infile;
-        }
-        istrmp = &ifstrm;
-    }
-
-    size_t nrecs = 0;
     bool more = true;
     while (more) {
-        more = process_record(*istrmp, nrecs);
+        more = process_record(*m_istrmp);
         if (m_dotrace) {
             cerr << endl;
         }
-        if (more)
-            ++nrecs;
     }
     m_output->flush();
-    cerr << "processed " << nrecs << " records" << endl;
+    cerr << "processed " << m_nrecs << " records" << endl;
 }
 
 void
@@ -603,39 +641,66 @@ Schema::traverse(NodeTraverser & nt)
     m_root->traverse(nt);
 }
 
+FileDescriptor const *
+Schema::process_header(istream & istrm)
+{
+    TLV rec = read_record(istrm);
+    if (rec.first != 0)
+        LOG(FATAL) << "expecting FileDescriptorSet (0), saw " << rec.first;
+    
+    FileDescriptorSet fds;
+    fds.ParseFromArray(rec.second.data(), rec.second.size());
+
+    FileDescriptorProto const & fdproto = fds.file(0);
+
+    return m_poolp->BuildFile(fdproto);
+}
+
+string
+Schema::process_rootmsg(istream & istrm)
+{
+    TLV rec = read_record(istrm);
+    if (rec.first != 1)
+        LOG(FATAL) << "expecting root msg name (1), saw " << rec.first;
+    
+    return string((char const *) rec.second.data(),
+                  (char const *) rec.second.data() + rec.second.size());
+}
+
 bool
-Schema::process_record(istream & istrm, size_t recnum)
+Schema::process_record(istream & istrm)
 {
     m_output->check_rowgrp_size();
 
-    // Read the record header, swap bytes as necessary.
-    int16_t proto;
-    int8_t type;
-    int32_t size;
+    TLV rec = read_record(istrm);
 
-    istrm.read((char *) &proto, sizeof(proto));
-    istrm.read((char *) &type, sizeof(type));
-    istrm.read((char *) &size, sizeof(size));
-
-    if (!istrm.good())
+    switch (rec.first) {
+    case 0xff:	// EOF
         return false;
-
-    // Looks like these fields aren't network order after all.
-    // proto = ntohs(proto);
-    // size = ntohl(size);
-
-    string buffer(size_t(size), '\0');
-    istrm.read(&buffer[0], size);
-
-    if (!istrm.good())
-        return false;
-
+        
+    case 0:	// FileDescriptorSet header
+        // Must have been called w/ explicit, skip ...
+        return true;
+        
+    case 1:	// root message name
+        // Must have been called w/ explicit, skip ...
+        return true;
+        
+    case 2:
+        // This is our record!
+        ++m_nrecs;
+        break;
+        
+    default:
+        LOG(FATAL) << "expecting data record (2), saw " << rec.first;
+        break;
+    }
     unique_ptr<Message> inmsg(m_proto->New());
 
-    inmsg->ParseFromString(buffer);
+    inmsg->ParseFromArray(rec.second.data(), rec.second.size());
 
     if (m_dotrace)
-        cerr << "Record: " << recnum+1 << endl
+        cerr << "Record: " << m_nrecs << endl
              << endl
              << inmsg->DebugString() << endl;
     

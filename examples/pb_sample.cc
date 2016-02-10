@@ -4,9 +4,14 @@
 // Copyright (c) 2015 Apsalar Inc. All rights reserved.
 //
 
-#include <arpa/inet.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
+#include <cerrno>
+#include <fstream>
 #include <iostream>
+#include <vector>
+#include <cstdint>
 
 #include <glog/logging.h>
 
@@ -17,32 +22,67 @@ using namespace google;
 
 namespace {
 
+string const g_fdspath = "./pb_sample.fds";
+
+void
+write_tlv(uint8_t tag, uint32_t len, void const * data)
+{
+    // uint8_t		tag
+    // uint32_t		len
+    // uint8_t[]	val
+    //
+    cout.write((char const *) &tag, sizeof(tag));
+    cout.write((char const *) &len, sizeof(len));
+    cout.write((char const *) data, len);
+}
+
+void
+output_header()
+{
+    // The header consists of:
+    //
+    // uint8_t		FileDescriptorSet tag (0)
+    // uint32_t		FileDescriptorSet size
+    // uint8_t[]	FileDescriptorSet data
+    //
+    // uint8_t		root message name tag (1)
+    // uint32_t		root message name size
+    // uint8_t[]	root message name data
+    
+    int fd = open(g_fdspath.c_str(), O_RDONLY);
+    if (fd == -1) {
+        cerr << "Trouble opening " << g_fdspath
+             << ": " << strerror(errno) << endl;
+        exit(2);
+    }
+    struct stat stat_buf;
+    int rv = fstat(fd, &stat_buf);
+    size_t fdssz = stat_buf.st_size;
+    vector<uint8_t> buf(fdssz);
+    ssize_t rdsz = read(fd, buf.data(), fdssz);
+
+    write_tlv(0, fdssz, buf.data());
+
+    string const rootmsg = "Document";
+
+    write_tlv(1, rootmsg.size(), rootmsg.data());
+}
+
 void
 output_document(pb_sample::Document const & doc)
 {
+    // Each record consists of:
+    //
+    // uint8_t		record tag (2)
+    // uint32_t		record size
+    // uint8_t[]	record data
+
     ostringstream ostrm;
     if (! doc.SerializeToOstream(&ostrm)) {
         LOG(FATAL) << "trouble serializing Document" << endl;
     }
 
-    // We write a record header which consists of:
-    // Protocol int16
-    // Type int8 // 1=owner,2=attr_feed
-    // Size int32
-
-    // Originaly thought these were network order
-    // int16_t proto = htons(1);
-    // int8_t type = 1;
-    // int32_t size = htonl(ostrm.str().size());
-
-    int16_t proto = 1;
-    int8_t type = 1;
-    int32_t size = ostrm.str().size();
-
-    cout.write((char const *) &proto, sizeof(proto));
-    cout.write((char const *) &type, sizeof(type));
-    cout.write((char const *) &size, sizeof(size));
-    cout.write(ostrm.str().data(), ostrm.str().size());
+    write_tlv(2, ostrm.str().size(), ostrm.str().data());
 }
 
 } // end namespace
@@ -54,6 +94,8 @@ main(int argc, char ** argv)
 
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
+    output_header();
+    
     pb_sample::Document document;
     pb_sample::Document_mlinks * links;
     pb_sample::Document_mname * name;

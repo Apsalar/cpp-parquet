@@ -15,6 +15,7 @@
 #include <google/protobuf/compiler/importer.h>
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/dynamic_message.h>
+#include <google/protobuf/descriptor.pb.h>
 
 #include <parquet-file2/parquet_column.h>
 #include <parquet-file2/parquet_file.h>
@@ -84,18 +85,26 @@ public:
     Schema(std::string const & i_protodir,
            std::string const & i_protofile,
            std::string const & i_rootmsg,
+           std::string const & i_infile,
            std::string const & i_outfile,
            size_t i_rowgrpsz,
            bool i_dotrace);
 
     void dump(std::ostream & ostrm);
 
-    void convert(std::string const & infile);
+    void convert();
 
 private:
     void traverse(NodeTraverser & nt);
 
-    bool process_record(std::istream & istrm, size_t recnum);
+    google::protobuf::FileDescriptor const *
+        process_header(std::istream & istrm);
+
+    std::string process_rootmsg(std::istream & istrm);
+    
+    bool process_record(std::istream & istrm);
+
+    std::unique_ptr<google::protobuf::DescriptorPool> m_poolp;
     
     google::protobuf::compiler::DiskSourceTree  m_srctree;
     std::unique_ptr<google::protobuf::compiler::MultiFileErrorCollector>
@@ -105,8 +114,12 @@ private:
     google::protobuf::DynamicMessageFactory     m_dmsgfact;
     google::protobuf::Message const *           m_proto;
 
+    std::ifstream								m_ifstrm;
+    std::istream *								m_istrmp;
     std::unique_ptr<parquet_file2::ParquetFile> m_output;
 
+    size_t										m_nrecs;
+    
     SchemaNodeHandle m_root;
     bool m_dotrace;
 };

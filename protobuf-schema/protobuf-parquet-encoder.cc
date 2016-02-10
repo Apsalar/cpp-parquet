@@ -142,12 +142,6 @@ parse_arguments(int & argc, char ** & argv)
         }
     }
 
-    if (g_protofile.empty()) {
-        cerr << "missing protofile argument" << endl;
-        usage(argc, argv);
-        exit(1);
-    }
-        
     if (g_rootmsg.empty()) {
         cerr << "missing rootmsg argument" << endl;
         usage(argc, argv);
@@ -172,6 +166,7 @@ int run(int & argc, char ** & argv)
     Schema schema(g_protodir,
                   g_protofile,
                   g_rootmsg,
+                  g_infile,
                   g_outfile,
                   rowgrpsz,
                   g_dotrace);
@@ -179,7 +174,7 @@ int run(int & argc, char ** & argv)
     if (g_dodump)
         schema.dump(cerr);
 
-    schema.convert(g_infile);
+    schema.convert();
 
     ShutdownProtobufLibrary();
     
