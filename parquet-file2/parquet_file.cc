@@ -100,7 +100,7 @@ ParquetFile::check_rowgrp_size()
     if (++m_nchecks % 100 != 0)
         return;
     
-    // Check the aggregate row group size and flush if we are getting
+    // Check the aggregate row group size and write if we are getting
     // too big.
 
     RowGroupSizer sizer;
@@ -108,13 +108,13 @@ ParquetFile::check_rowgrp_size()
     m_root->traverse(sizer);
 
     if (sizer.m_rowgrp_size >= m_rowgrpsz)
-        flush_row_group();
+        write_row_group();
 }
 
 void
-ParquetFile::flush()
+ParquetFile::write_file()
 {
-    flush_row_group();
+    write_row_group();
     
     m_file_meta_data.__set_num_rows(m_num_rows);
     m_file_meta_data.__set_row_groups(m_row_groups);
@@ -126,7 +126,7 @@ ParquetFile::flush()
 }
 
 void
-ParquetFile::flush_row_group()
+ParquetFile::write_row_group()
 {
     // Make sure we have the same number of records in all leaf
     // columns.
@@ -149,7 +149,7 @@ ParquetFile::flush_row_group()
         ParquetColumnHandle const & ch = *it;
 
         ColumnMetaData column_metadata =
-            ch->flush_row_group(m_fd, m_protocol.get());
+            ch->write_row_group(m_fd, m_protocol.get());
 
         row_group.__set_total_byte_size
             (row_group.total_byte_size +

@@ -103,7 +103,7 @@ TEST_F(ParquetFileTest, AddColumn) {
 
     CHECK_EQ(pqh1->num_rowgrp_records(), nrecs) << "num_records incorrect";
 
-    pqfile.flush();
+    pqfile.write_file();
 }
 
 }  // end namespace parquet_file2

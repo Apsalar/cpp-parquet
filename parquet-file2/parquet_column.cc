@@ -227,7 +227,7 @@ ParquetColumn::traverse(Traverser & tt)
 }
 
 ColumnMetaData
-ParquetColumn::flush_row_group(int fd, TCompactProtocol * protocol)
+ParquetColumn::write_row_group(int fd, TCompactProtocol * protocol)
 {
     // Finialize any remaining data.
     if (m_num_page_values)
@@ -259,10 +259,10 @@ ParquetColumn::flush_row_group(int fd, TCompactProtocol * protocol)
 
         ssize_t rv = write(fd, out.data(), out.size());
         if (rv < 0) {
-            LOG(FATAL) << "flush dict: write failed: " << strerror(errno);
+            LOG(FATAL) << "write dict failed: " << strerror(errno);
         }
         else if (rv != out.size()) {
-            LOG(FATAL) << "flush: unexpected write size:"
+            LOG(FATAL) << "write: unexpected size:"
                        << " expecting " << out.size() << ", saw " << rv;
         }
         m_uncompressed_size += dictsz;
@@ -277,7 +277,7 @@ ParquetColumn::flush_row_group(int fd, TCompactProtocol * protocol)
     for (DataPageHandle dph : m_pages) {
         // The m_uncompressed_page_size and m_compressed_size
         // were updated during in finalize_page ...
-        size_t header_size = dph->flush(fd, protocol);
+        size_t header_size = dph->write_page(fd, protocol);
         VLOG(2) << path_string()
                 << " pg " << pgndx << " header_size " << header_size;
         m_uncompressed_size += header_size;
@@ -325,15 +325,15 @@ ParquetColumn::schema_element() const
 }
 
 size_t
-ParquetColumn::DataPage::flush(int fd, TCompactProtocol * protocol)
+ParquetColumn::DataPage::write_page(int fd, TCompactProtocol * protocol)
 {
     size_t header_size = m_page_header.write(protocol);
     ssize_t rv = write(fd, m_page_data.data(), m_page_data.size());
     if (rv < 0) {
-        LOG(FATAL) << "flush: write failed: " << strerror(errno);
+        LOG(FATAL) << "DataPage write failed: " << strerror(errno);
     }
     else if (rv != m_page_data.size()) {
-        LOG(FATAL) << "flush: unexpected write size:"
+        LOG(FATAL) << "DataPage write: unexpected size:"
                    << " expecting " << m_page_data.size() << ", saw " << rv;
     }
     return header_size;

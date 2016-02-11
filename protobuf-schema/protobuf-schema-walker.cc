@@ -631,7 +631,7 @@ Schema::convert()
             cerr << endl;
         }
     }
-    m_output->flush();
+    m_output->write_file();
     cerr << "processed " << m_nrecs << " records" << endl;
 }
 

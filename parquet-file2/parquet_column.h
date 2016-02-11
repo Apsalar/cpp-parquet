@@ -80,7 +80,7 @@ public:
 
     void traverse(Traverser & tt);
 
-    parquet::ColumnMetaData flush_row_group(int fd,
+    parquet::ColumnMetaData write_row_group(int fd,
                     apache::thrift::protocol::TCompactProtocol * protocol);
 
     parquet::SchemaElement schema_element() const;
@@ -93,8 +93,9 @@ private:
         parquet::PageHeader	m_page_header;
         OctetSeq			m_page_data;
 
-        size_t flush(int fd,
-                     apache::thrift::protocol::TCompactProtocol* protocol);
+        size_t
+        write_page(int fd,
+                   apache::thrift::protocol::TCompactProtocol * protocol);
     };
     typedef std::shared_ptr<DataPage> DataPageHandle;
     typedef std::deque<DataPageHandle> DataPageSeq;

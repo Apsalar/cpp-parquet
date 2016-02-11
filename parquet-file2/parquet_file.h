@@ -34,10 +34,10 @@ public:
 
     void check_rowgrp_size();
 
-    void flush();
+    void write_file();
 
 private:
-    void flush_row_group();
+    void write_row_group();
     
     std::string m_path;
     size_t m_rowgrpsz;
