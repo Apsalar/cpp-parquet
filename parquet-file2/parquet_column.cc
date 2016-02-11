@@ -204,6 +204,19 @@ ParquetColumn::rowgrp_size() const
     return m_compressed_size;
 }
 
+size_t
+ParquetColumn::estimated_rowgrp_size() const
+{
+    // Provide a very rough estimate of the size of this rowgroup.
+    // Presumes a compression ratio of 3 on the dictionary.  The
+    // compressed page data size is in m_compressed_size.  Add some
+    // per-page hesader overhead as well.
+    return
+        m_dict_enc.m_data.size() / 3 + 100 +
+        m_pages.size() * 100 +
+        m_compressed_size;
+}
+
 void
 ParquetColumn::traverse(Traverser & tt)
 {

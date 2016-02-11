@@ -88,7 +88,7 @@ public:
     RowGroupSizer() : m_rowgrp_size(0L) {}
     
     virtual void operator()(ParquetColumnHandle const & ch) {
-        m_rowgrp_size += ch->rowgrp_size();
+        m_rowgrp_size += ch->estimated_rowgrp_size();
     }
     size_t m_rowgrp_size;
 };

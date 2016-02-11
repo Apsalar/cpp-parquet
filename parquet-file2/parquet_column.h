@@ -70,6 +70,8 @@ public:
 
     size_t rowgrp_size() const;
 
+    size_t estimated_rowgrp_size() const;
+
     class Traverser
     {
     public:
