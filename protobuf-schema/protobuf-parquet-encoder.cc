@@ -43,7 +43,7 @@ bool g_dotrace = false;
 void
 usage(int & argc, char ** & argv)
 {
-    cerr << "usage: " << argv[0] << " [options] -p <protofile> -m <rootmsg> -o <outfile> [-i <infile>]" << endl
+    cerr << "usage: " << argv[0] << " [options] [-p <protofile> -m <rootmsg>] -o <outfile> [-i <infile>]" << endl
          << "  options:" << endl
          << "    -h, --help            display usage" << endl
          << "    -d, --protodir=DIR    protobuf src dir    [" << DEF_PROTODIR << "]" << endl
@@ -140,12 +140,6 @@ parse_arguments(int & argc, char ** & argv)
             exit(1);
             break;
         }
-    }
-
-    if (g_rootmsg.empty()) {
-        cerr << "missing rootmsg argument" << endl;
-        usage(argc, argv);
-        exit(1);
     }
 
     if (g_outfile.empty()) {
