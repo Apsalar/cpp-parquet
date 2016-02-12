@@ -64,16 +64,16 @@ parse_arguments(int & argc, char ** & argv)
 
     static struct option long_options[] =
         {
-            {"usage",                   no_argument,        0, 'h'},
-            {"protodir",                required_argument,  0, 'd'},
-            {"protofile",               required_argument,  0, 'p'},
-            {"rootmsg",                 required_argument,  0, 'm'},
-            {"infile",                  required_argument,  0, 'i'},
-            {"outfile",                 required_argument,  0, 'o'},
-            {"row-group-mb",            required_argument,  0, 's'},
-            {"dump",                    no_argument,        0, 'u'},
-            {"trace",                   no_argument,        0, 't'},
-            {0, 0, 0, 0}
+	  {(char *) "usage",                   no_argument,        0, 'h'},
+	  {(char *) "protodir",                required_argument,  0, 'd'},
+	  {(char *) "protofile",               required_argument,  0, 'p'},
+	  {(char *) "rootmsg",                 required_argument,  0, 'm'},
+	  {(char *) "infile",                  required_argument,  0, 'i'},
+	  {(char *) "outfile",                 required_argument,  0, 'o'},
+	  {(char *) "row-group-mb",            required_argument,  0, 's'},
+	  {(char *) "dump",                    no_argument,        0, 'u'},
+	  {(char *) "trace",                   no_argument,        0, 't'},
+	  {0, 0, 0, 0}
         };
 
     while (true)
