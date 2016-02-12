@@ -57,5 +57,5 @@ int main(int argc, char* argv[]) {
       ch2->add_datum(&ii, sizeof(ii), false, 0, 0);
   }
 
-  output.flush();
+  output.write_file();
 }
