@@ -26,7 +26,7 @@ ParquetFile::ParquetFile(string const & i_path, size_t i_rowgrpsz)
     , m_num_rows(0)
     , m_nchecks(0)
 {
-    m_fd = open(i_path.c_str(), O_RDWR | O_CREAT | O_EXCL, 0700);
+    m_fd = open(i_path.c_str(), O_RDWR | O_CREAT | O_EXCL, 0664);
     
     LOG_IF(FATAL, m_fd == -1)
         << "trouble creating file " << i_path.c_str()
