@@ -28,4 +28,4 @@ IF(SYSTEM_HAS_TR1_TUPLE)
 	"-DGTEST_USE_OWN_TR1_TUPLE=0")
 ENDIF(SYSTEM_HAS_TR1_TUPLE)
 
-TARGET_LINK_LIBRARIES(parquet-file-test libcppparquet pthread glog thrift parquet-thrift)
+TARGET_LINK_LIBRARIES(parquet-file-test libcppparquet pthread glog thrift parquet-thrift ${OPENSSL_LIBRARIES})
