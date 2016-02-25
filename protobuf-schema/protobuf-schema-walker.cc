@@ -560,7 +560,8 @@ Schema::Schema(string const & i_protodir,
                string const & i_outfile,
                size_t i_rowgrpsz,
                bool i_dotrace)
-    : m_dotrace(i_dotrace)
+    : m_protofile(i_protofile)
+    , m_dotrace(i_dotrace)
     , m_nrecs(0ULL)
 {
     if (i_infile == "-") {
@@ -672,38 +673,66 @@ Schema::process_record(istream & istrm)
 {
     m_output->check_rowgrp_size();
 
-    TLV rec = read_record(istrm);
-
-    switch (rec.first) {
-    case 0xff:	// EOF
-        return false;
-        
-    case 0:	// FileDescriptorSet header
-        // Must have been called w/ explicit, skip ...
-        return true;
-        
-    case 1:	// root message name
-        // Must have been called w/ explicit, skip ...
-        return true;
-        
-    case 2:
-        // This is our record!
-        ++m_nrecs;
-        break;
-        
-    default:
-        LOG(FATAL) << "expecting data record (2), saw " << rec.first;
-        break;
-    }
     unique_ptr<Message> inmsg(m_proto->New());
 
-    inmsg->ParseFromArray(rec.second.data(), rec.second.size());
+    if (!m_protofile.empty()) {
+        // Use the original protocol.
 
+        // Read the record header, swap bytes as necessary.
+        int16_t proto;
+        int8_t type;
+        int32_t size;
+ 
+        istrm.read((char *) &proto, sizeof(proto));
+        istrm.read((char *) &type, sizeof(type));
+        istrm.read((char *) &size, sizeof(size));
+
+        if (!istrm.good())
+            return false;
+
+        string buffer(size_t(size), '\0');
+        istrm.read(&buffer[0], size);
+        if (!istrm.good())
+            return false;
+
+        ++m_nrecs;
+        
+        inmsg->ParseFromString(buffer);
+
+    } else {
+        // Use the new protocol.
+        
+        TLV rec = read_record(istrm);
+
+        switch (rec.first) {
+        case 0xff:	// EOF
+            return false;
+        
+        case 0:	// FileDescriptorSet header
+            // Must have been called w/ explicit, skip ...
+            return true;
+        
+        case 1:	// root message name
+            // Must have been called w/ explicit, skip ...
+            return true;
+        
+        case 2:
+            // This is our record!
+            ++m_nrecs;
+            break;
+        
+        default:
+            LOG(FATAL) << "expecting data record (2), saw " << rec.first;
+            break;
+        }
+
+        inmsg->ParseFromArray(rec.second.data(), rec.second.size());
+    }
     if (m_dotrace)
         cerr << "Record: " << m_nrecs << endl
              << endl
              << inmsg->DebugString() << endl;
-    
+
     m_root->propagate_message(inmsg.get(), 0, 0);
 
     return true;

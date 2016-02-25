@@ -105,6 +105,8 @@ private:
     bool process_record(std::istream & istrm);
 
     std::unique_ptr<google::protobuf::DescriptorPool> m_poolp;
+
+    std::string									m_protofile;
     
     google::protobuf::compiler::DiskSourceTree  m_srctree;
     std::unique_ptr<google::protobuf::compiler::MultiFileErrorCollector>
