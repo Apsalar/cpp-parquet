@@ -39,8 +39,7 @@ ParquetFile::ParquetFile(string const & i_path, size_t i_rowgrpsz)
 
     // Parquet-specific metadata for the file.
     m_file_meta_data.__set_version(1);
-    // m_file_meta_data.__set_created_by("Apsalar");
-    m_file_meta_data.__set_created_by("Neal sid");
+    m_file_meta_data.__set_created_by("Apsalar");
 }
 
 class SchemaBuilder : public ParquetColumn::Traverser
