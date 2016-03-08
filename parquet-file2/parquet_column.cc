@@ -340,16 +340,6 @@ ParquetColumn::DataPage::write_page(int fd, TCompactProtocol * protocol)
 }
 
 void
-ParquetColumn::check_full(size_t i_size)
-{
-    if (m_data.size() + i_size > PAGE_SIZE ||
-        m_rep_enc.IsFull() ||
-        m_def_enc.IsFull() ||
-        m_val_enc.IsFull())
-        finalize_page();
-}
-
-void
 ParquetColumn::add_levels(int i_replvl, int i_deflvl)
 {
     if (m_maxreplvl > 0)

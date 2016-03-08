@@ -100,7 +100,14 @@ private:
     typedef std::shared_ptr<DataPage> DataPageHandle;
     typedef std::deque<DataPageHandle> DataPageSeq;
 
-    void check_full(size_t i_size);
+    inline void check_full(size_t i_size)
+    {
+        if (m_data.size() + i_size > PAGE_SIZE ||
+            m_rep_enc.IsFull() ||
+            m_def_enc.IsFull() ||
+            m_val_enc.IsFull())
+            finalize_page();
+    }
     
     void add_levels(int i_replvl, int i_deflvl);
 
@@ -128,7 +135,7 @@ private:
     ParquetColumnSeq m_children;
 
     // Page accumulation
-    OctetBuffer m_data;
+    OctetSeq m_data;
     size_t m_num_page_values;
     impala::RleEncoder m_rep_enc;	// Repetition Level
     impala::RleEncoder m_def_enc;	// Definition Level
