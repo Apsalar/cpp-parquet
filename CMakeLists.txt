@@ -32,3 +32,5 @@ ADD_SUBDIRECTORY(parquet-file2)
 # ADD_SUBDIRECTORY(avro-schema)
 ADD_SUBDIRECTORY(protobuf-schema)
 ADD_SUBDIRECTORY(examples)
+
+set(CMAKE_BUILD_TYPE Release)
