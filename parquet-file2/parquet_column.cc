@@ -103,7 +103,7 @@ ParquetColumn::add_datum(void const * i_ptr,
             if (i_isvarlen) {
                 uint32_t len = i_size;
                 uint8_t * lenptr = (uint8_t *) &len;
-                m_data.insert(m_data.end(), lenptr, lenptr + sizeof(len));
+                m_data.append((char const *) lenptr, sizeof(len));
             }
             m_data.append(static_cast<char const *>(i_ptr), i_size);
             break;
@@ -131,9 +131,7 @@ ParquetColumn::add_boolean_datum(bool i_val,
     ++m_bool_cnt;
 
     if (m_bool_cnt == 8) {
-        m_data.insert(m_data.end(),
-                      static_cast<uint8_t const *>(&m_bool_buf),
-                      static_cast<uint8_t const *>(&m_bool_buf) + 1);
+        m_data.append((char const *) &m_bool_buf, 1);
         m_bool_buf = 0;
         m_bool_cnt = 0;
     }
@@ -364,9 +362,7 @@ ParquetColumn::finalize_page()
     m_val_enc.Flush();
 
     if (m_bool_cnt) {
-        m_data.insert(m_data.end(),
-                      static_cast<uint8_t const *>(&m_bool_buf),
-                      static_cast<uint8_t const *>(&m_bool_buf) + 1);
+        m_data.append((char const *) &m_bool_buf, 1);
         m_bool_buf = 0;
         m_bool_cnt = 0;
     }
@@ -442,22 +438,22 @@ ParquetColumn::concatenate_page_data(string & buf)
     uint8_t * lenptr = (uint8_t *) &len;
     len = m_rep_enc.len();
     if (len) {
-        buf.insert(buf.end(), lenptr, lenptr + sizeof(len));
-        buf.insert(buf.end(), m_rep_buf, m_rep_buf + len);
+        buf.append((char const *) lenptr, sizeof(len));
+        buf.append((char const *) m_rep_buf, len);
     }
     len = m_def_enc.len();
     if (len) {
-        buf.insert(buf.end(), lenptr, lenptr + sizeof(len));
-        buf.insert(buf.end(), m_def_buf, m_def_buf + len);
+        buf.append((char const *) lenptr, sizeof(len));
+        buf.append((char const *) m_def_buf, len);
     }
     switch (m_encoding) {
     case Encoding::PLAIN:
-        buf.insert(buf.end(), m_data.begin(), m_data.end());
+        buf.append(m_data);
         break;
     case Encoding::PLAIN_DICTIONARY:
-        buf.insert(buf.end(), &bitwidth, &bitwidth + 1);
+        buf.append((char const *) &bitwidth, 1);
         len = m_val_enc.len();
-        buf.insert(buf.end(), m_val_buf, m_val_buf + len);
+        buf.append((char const *) m_val_buf, len);
         break;
     default:
         LOG(FATAL) << "unsupported encoding: " << int(m_encoding);
