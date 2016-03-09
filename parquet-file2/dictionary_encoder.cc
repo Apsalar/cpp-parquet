@@ -13,8 +13,8 @@ namespace parquet_file2 {
 
 DictionaryEncoder::DictionaryEncoder()
     : m_nvals(0)
+    , m_map(MAX_NVALS)
 {
-
 }
 
 uint32_t
