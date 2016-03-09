@@ -7,24 +7,23 @@
 
 #pragma once
 
+#include <string>
 #include <vector>
 
 #include "parquet_types.h"
 
 namespace parquet_file2 {
 
-typedef std::vector<uint8_t> OctetSeq;
-
 class Compressor
 {
 public:
     Compressor(parquet::CompressionCodec::type i_compression_codec);
 
-    void compress(OctetSeq & in, OctetSeq & out);
+    void compress(std::string & in, std::string & out);
 
 private:
     parquet::CompressionCodec::type m_compression_codec;
-    OctetSeq m_tmp;
+    std::string m_tmp;
 };
     
 } // end namespace parquet_file2

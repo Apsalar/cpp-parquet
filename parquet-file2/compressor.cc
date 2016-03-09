@@ -25,7 +25,7 @@ Compressor::Compressor(parquet::CompressionCodec::type i_compression_codec)
 }
 
 void
-Compressor::compress(OctetSeq & in, OctetSeq & out)
+Compressor::compress(std::string & in, std::string & out)
 {
     switch (m_compression_codec) {
     case CompressionCodec::UNCOMPRESSED:
@@ -66,7 +66,7 @@ Compressor::compress(OctetSeq & in, OctetSeq & out)
             stream.next_in =
                 const_cast<Bytef*>(reinterpret_cast<const Bytef*>(in.data()));
             stream.avail_in = in.size();
-            stream.next_out = reinterpret_cast<Bytef*>(m_tmp.data());
+            stream.next_out = (Bytef*) m_tmp.data();
             stream.avail_out = m_tmp.size();
             rv = deflate(&stream, Z_FINISH);
             if (rv != Z_STREAM_END) {

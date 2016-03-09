@@ -26,7 +26,6 @@
 namespace parquet_file2 {
 
 typedef std::vector<std::string> StringSeq;
-typedef std::vector<uint8_t> OctetSeq;
 
 class ParquetColumn;
 typedef std::shared_ptr<ParquetColumn> ParquetColumnHandle;
@@ -90,7 +89,7 @@ private:
     struct DataPage
     {
         parquet::PageHeader	m_page_header;
-        OctetSeq			m_page_data;
+        std::string			m_page_data;
 
         size_t
         write_page(int fd,
@@ -112,7 +111,7 @@ private:
 
     void finalize_page();
     
-    void concatenate_page_data(OctetSeq & buffer);
+    void concatenate_page_data(std::string & buffer);
 
     void reset_page_state();
     
@@ -134,7 +133,7 @@ private:
     ParquetColumnSeq m_children;
 
     // Page accumulation
-    OctetSeq m_data;
+    std::string m_data;
     size_t m_num_page_values;
     impala::RleEncoder m_rep_enc;	// Repetition Level
     impala::RleEncoder m_def_enc;	// Definition Level
@@ -142,7 +141,7 @@ private:
     uint8_t m_rep_buf[PAGE_SIZE];
     uint8_t m_def_buf[PAGE_SIZE];
     uint8_t m_val_buf[PAGE_SIZE];
-    OctetSeq m_concat_buffer;
+    std::string m_concat_buffer;
     uint8_t m_bool_buf;
     int m_bool_cnt;
     

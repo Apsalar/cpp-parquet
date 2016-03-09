@@ -240,7 +240,7 @@ ParquetColumn::write_row_group(int fd, TCompactProtocol * protocol)
 
         m_concat_buffer.assign(m_dict_enc.m_data.begin(),
                                m_dict_enc.m_data.end());
-        OctetSeq out;
+        string out;
         m_compressor.compress(m_concat_buffer, out);
         
         DictionaryPageHeader dph;
@@ -400,7 +400,7 @@ ParquetColumn::finalize_page()
             << " m_rep_enc.len() " << m_rep_enc.len()
             << " m_def_enc.len() " << m_def_enc.len();
 
-    OctetSeq & out = dph->m_page_data;
+    string & out = dph->m_page_data;
     
     m_concat_buffer.reserve(uncompressed_page_size);
     concatenate_page_data(m_concat_buffer);
@@ -435,7 +435,7 @@ ParquetColumn::finalize_page()
 }
 
 void
-ParquetColumn::concatenate_page_data(OctetSeq & buf)
+ParquetColumn::concatenate_page_data(string & buf)
 {
     buf.clear();		// Doesn't release memory
 
