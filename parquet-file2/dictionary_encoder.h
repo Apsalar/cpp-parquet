@@ -9,7 +9,6 @@
 
 #include <stdint.h>
 
-#include <deque>
 #include <stdexcept>
 #include <unordered_map>
 #include <vector>
@@ -30,7 +29,6 @@ struct hash<vector<uint8_t>>
 namespace parquet_file2 {
 
 typedef std::vector<uint8_t> OctetSeq;
-typedef std::deque<uint8_t> OctetBuffer;
 
 typedef std::unordered_map<OctetSeq, uint32_t> ValueIndexMap;
 
@@ -47,7 +45,7 @@ public:
     static size_t const MAX_NVALS = 40 * 1000;
     
     size_t m_nvals;
-    OctetBuffer m_data;
+    OctetSeq m_data;
 
 private:
     ValueIndexMap m_map;

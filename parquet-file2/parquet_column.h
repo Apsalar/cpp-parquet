@@ -27,7 +27,6 @@ namespace parquet_file2 {
 
 typedef std::vector<std::string> StringSeq;
 typedef std::vector<uint8_t> OctetSeq;
-typedef std::deque<uint8_t> OctetBuffer;
 
 class ParquetColumn;
 typedef std::shared_ptr<ParquetColumn> ParquetColumnHandle;
