@@ -23,8 +23,8 @@ DictionaryEncoder::encode_datum(void const * i_ptr,
                                 bool i_isvarlen)
     throw(overflow_error)
 {
-    OctetSeq val(static_cast<uint8_t const *>(i_ptr),
-                 static_cast<uint8_t const *>(i_ptr) + i_size);
+    string val(static_cast<char const *>(i_ptr),
+               static_cast<char const *>(i_ptr) + i_size);
 
     auto pos = m_map.find(val);
     if (pos != m_map.end()) {
@@ -40,8 +40,8 @@ DictionaryEncoder::encode_datum(void const * i_ptr,
             m_data.insert(m_data.end(), lenptr, lenptr + sizeof(len));
         }
         m_data.insert(m_data.end(),
-                      static_cast<uint8_t const *>(i_ptr),
-                      static_cast<uint8_t const *>(i_ptr) + i_size);
+                      static_cast<char const *>(i_ptr),
+                      static_cast<char const *>(i_ptr) + i_size);
         uint32_t ndx = m_nvals++;
         m_map.insert(make_pair(val, ndx));
         return ndx;
