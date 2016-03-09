@@ -105,9 +105,7 @@ ParquetColumn::add_datum(void const * i_ptr,
                 uint8_t * lenptr = (uint8_t *) &len;
                 m_data.insert(m_data.end(), lenptr, lenptr + sizeof(len));
             }
-            m_data.insert(m_data.end(),
-                          static_cast<uint8_t const *>(i_ptr),
-                          static_cast<uint8_t const *>(i_ptr) + i_size);
+            m_data.append(static_cast<char const *>(i_ptr), i_size);
             break;
         case Encoding::PLAIN_DICTIONARY:
             m_val_enc.Put(enc_val);
